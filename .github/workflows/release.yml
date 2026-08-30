@@ -24,7 +24,7 @@ jobs:
 
       - name: Match tag to package version
         run: |
-          PACKAGE_VERSION=$(bun -e 'console.log((await Bun.file("package.json").json()).version)')
+          PACKAGE_VERSION=$(jq -r '.version' package.json)
           test "v${PACKAGE_VERSION}" = "${GITHUB_REF_NAME}"
 
       - name: Install dependencies
