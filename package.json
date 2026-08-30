@@ -2,6 +2,15 @@
   "name": "minds-cli",
   "version": "0.3.0",
   "description": "Talk with the minds that shaped the world.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0xmiki/minds-cli.git"
+  },
+  "homepage": "https://github.com/0xmiki/minds-cli#readme",
+  "bugs": {
+    "url": "https://github.com/0xmiki/minds-cli/issues"
+  },
   "type": "module",
   "bin": {
     "minds": "./dist/index.js"
@@ -12,7 +21,7 @@
   },
   "scripts": {
     "dev": "bun src/index.ts",
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && chmod +x dist/index.js && mkdir -p node_modules/.bin && ln -sf ../../dist/index.js node_modules/.bin/minds",
+    "build": "bun scripts/build.ts",
     "typecheck": "tsc --noEmit",
     "test": "DEBUG= bun test",
     "start": "bun dist/index.js"
@@ -24,7 +33,7 @@
   },
   "dependencies": {
     "@opentui/core": "0.5.9",
-    "@opentui/solid": "^0.5.9",
+    "@opentui/solid": "0.5.9",
     "@simonklee/opentui-tex": "https://github.com/simonklee/opentui-tex/releases/download/v0.1.0/simonklee-opentui-tex-0.1.0.tgz",
     "solid-js": "1.9.12"
   },

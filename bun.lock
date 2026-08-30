@@ -6,7 +6,7 @@
       "name": "minds-cli",
       "dependencies": {
         "@opentui/core": "0.5.9",
-        "@opentui/solid": "^0.5.9",
+        "@opentui/solid": "0.5.9",
         "@simonklee/opentui-tex": "https://github.com/simonklee/opentui-tex/releases/download/v0.1.0/simonklee-opentui-tex-0.1.0.tgz",
         "solid-js": "1.9.12",
       },

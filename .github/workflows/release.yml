@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build GitHub release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+
+      - name: Match tag to package version
+        run: |
+          PACKAGE_VERSION=$(bun -e 'console.log((await Bun.file("package.json").json()).version)')
+          test "v${PACKAGE_VERSION}" = "${GITHUB_REF_NAME}"
+
+      - name: Install dependencies
+        run: bun ci
+
+      - name: Verify
+        run: |
+          bun run typecheck
+          bun test
+        env:
+          DEBUG: ""
+
+      - name: Build
+        run: bun run build
+
+      - name: Pack release archive
+        run: |
+          bun pm pack --filename minds-cli.tgz
+          tar -tzf minds-cli.tgz | grep -q '^package/dist/index.js$'
+          tar -tzf minds-cli.tgz | grep -q '^package/minds/Aristotle/mind.json$'
+          sha256sum minds-cli.tgz > minds-cli.tgz.sha256
+
+      - name: Publish GitHub release
+        run: gh release create "${GITHUB_REF_NAME}" minds-cli.tgz minds-cli.tgz.sha256 --title "Minds ${GITHUB_REF_NAME}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
