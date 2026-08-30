@@ -44,6 +44,7 @@ jobs:
         run: |
           bun pm pack --filename minds-cli.tgz
           tar -tzf minds-cli.tgz | grep -q '^package/dist/index.js$'
+          tar -tzf minds-cli.tgz | grep -q '^package/dist/app.js$'
           tar -tzf minds-cli.tgz | grep -q '^package/minds/Aristotle/mind.json$'
           sha256sum minds-cli.tgz > minds-cli.tgz.sha256
 

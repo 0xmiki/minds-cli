@@ -1,4 +1,4 @@
-import { chmod, mkdir, rm, symlink } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import solidPlugin from "@opentui/solid/bun-plugin";
 
@@ -23,6 +23,13 @@ if (!result.success) {
 }
 
 const executable = join(output, "index.js");
+const application = join(output, "app.js");
+const bundled = await readFile(executable, "utf8");
+await writeFile(application, bundled.replace(/^#![^\n]*\n/, ""));
+await writeFile(executable, `#!/usr/bin/env bun
+await import("@opentui/solid/preload");
+await import("./app.js");
+`);
 await chmod(executable, 0o755);
 
 const binDirectory = join(root, "node_modules/.bin");

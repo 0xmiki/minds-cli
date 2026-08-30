@@ -183,7 +183,7 @@ export class CodexAppServer {
     lines.on("line", (line) => this.handleLine(line));
 
     await this.request("initialize", {
-      clientInfo: { name: "minds", title: "minds", version: "0.3.0" },
+      clientInfo: { name: "minds", title: "minds", version: "0.3.1" },
       capabilities: null,
     });
     this.notify("initialized");

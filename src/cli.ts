@@ -7,7 +7,7 @@ import { ConversationStore } from "./storage.ts";
 import { runChat } from "./tui/index.tsx";
 import type { ResponseMode } from "./types.ts";
 
-const HELP = `minds 0.3.0
+const HELP = `minds 0.3.1
 
 Usage:
   minds                         Open the last-used mind in a new conversation
@@ -55,7 +55,7 @@ export async function runCli(args = process.argv.slice(2)): Promise<number> {
     return 0;
   }
   if (command === "--version" || command === "-v") {
-    console.log("0.3.0");
+    console.log("0.3.1");
     return 0;
   }
 
