@@ -12,7 +12,7 @@ Requirements:
 
 - Bun 1.3 or newer
 - Codex CLI installed and logged in
-- Linux or macOS
+- Linux, macOS, or Windows
 
 Install the latest GitHub release:
 
