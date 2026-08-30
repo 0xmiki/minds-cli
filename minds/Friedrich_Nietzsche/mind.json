@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "id": "Friedrich_Nietzsche",
+  "name": "Friedrich Nietzsche",
+  "version": "0.2.0",
+  "default_language": "en",
+  "core": "core.md"
+}

@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "id": "Aristotle",
+  "name": "Aristotle",
+  "version": "0.1.0",
+  "default_language": "en",
+  "core": "core.md"
+}

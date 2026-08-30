@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "id": "Nikola_Tesla",
+  "name": "Nikola Tesla",
+  "version": "0.2.0",
+  "default_language": "en",
+  "core": "core.md"
+}

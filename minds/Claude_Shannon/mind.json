@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "id": "Claude_Shannon",
+  "name": "Claude Shannon",
+  "version": "0.2.0",
+  "default_language": "en",
+  "core": "core.md"
+}
