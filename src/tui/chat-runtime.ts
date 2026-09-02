@@ -3,16 +3,18 @@ import { join } from "node:path";
 import { CodexAppServer } from "../codex-app-server.ts";
 import type { MindsPaths } from "../paths.ts";
 import { ConversationStore } from "../storage.ts";
-import type { Conversation, InstalledMind, MessageStatus, NativeThreadSummary, ResponseMode } from "../types.ts";
+import type { Conversation, InstalledMind, Message, MessageStatus, ResponseMode } from "../types.ts";
 
 export class ChatRuntime {
-  private server: CodexAppServer | null = null;
-  private started = false;
-  private pendingThreadId: string | null = null;
   private conversation: Conversation;
   private selectedResponseMode: ResponseMode;
+  private activatedKey: string | null = null;
+  private activatedGeneration = 0;
+  private threadHasName = false;
+  private identityHandoffPending = false;
 
   constructor(
+    private readonly server: CodexAppServer,
     private mind: InstalledMind,
     private readonly store: ConversationStore,
     private readonly paths: MindsPaths,
@@ -24,6 +26,7 @@ export class ChatRuntime {
     this.selectedResponseMode = requestedResponseMode ?? conversation.responseMode;
     if (requestedResponseMode && requestedResponseMode !== conversation.responseMode) {
       this.store.setResponseMode(conversation.id, requestedResponseMode);
+      this.conversation = this.store.getConversation(conversation.id) ?? conversation;
     }
   }
 
@@ -36,7 +39,7 @@ export class ChatRuntime {
   }
 
   get model(): string | null {
-    return this.server?.model ?? this.currentConversation.model ?? this.requestedModel ?? null;
+    return this.currentConversation.model ?? this.requestedModel ?? null;
   }
 
   get responseMode(): ResponseMode {
@@ -47,52 +50,59 @@ export class ChatRuntime {
     return join(this.paths.workspaces, "threads");
   }
 
+  private get activationKey(): string {
+    return [
+      this.currentConversation.codexThreadId ?? "new",
+      this.mind.manifest.id,
+      this.mind.manifest.version,
+      this.selectedResponseMode,
+      this.requestedModel ?? this.currentConversation.model ?? "default",
+    ].join("\u0000");
+  }
+
   async prepare(): Promise<void> {
-    this.server?.close();
-    this.server = new CodexAppServer();
-    this.started = false;
-    this.pendingThreadId = null;
     await mkdir(this.workspace, { recursive: true });
     await this.server.prepare(this.workspace);
   }
 
-  async start(identityHandoff = false): Promise<void> {
-    if (!this.server) await this.prepare();
-    const server = this.server!;
-    const history = this.store.messages(this.conversation.id);
-    const legacyConversation = !this.conversation.codexThreadId && history.length > 0;
-    const result = await server.start(
+  private async ensureThread(history: Message[]): Promise<string> {
+    await this.prepare();
+    const key = this.activationKey;
+    if (
+      this.currentConversation.codexThreadId
+      && this.activatedKey === key
+      && this.activatedGeneration === this.server.generation
+    ) {
+      return this.currentConversation.codexThreadId;
+    }
+
+    const resumeThreadId = this.currentConversation.codexThreadId ?? undefined;
+    const result = await this.server.start(
       this.mind,
       history,
       this.workspace,
-      this.requestedModel ?? this.conversation.model ?? undefined,
+      this.requestedModel ?? this.currentConversation.model ?? undefined,
       this.selectedResponseMode,
-      this.conversation.codexThreadId ?? undefined,
-      legacyConversation,
-      identityHandoff,
+      resumeThreadId,
+      false,
+      this.identityHandoffPending,
     );
-    if (!legacyConversation && !this.conversation.codexThreadId) this.pendingThreadId = result.threadId;
+
+    if (!resumeThreadId) this.store.setCodexThreadId(this.conversation.id, result.threadId);
     if (result.messages.length > 0 && this.store.messageCount(this.conversation.id) === 0) {
       this.store.replaceMessages(this.conversation.id, result.messages);
     }
-    if (server.model) this.store.setModel(this.conversation.id, server.model);
+    if (result.model) this.store.setModel(this.conversation.id, result.model);
     this.conversation = this.store.getConversation(this.conversation.id) ?? this.conversation;
-    this.started = true;
+    this.threadHasName = result.hasName;
+    this.identityHandoffPending = false;
+    this.activatedGeneration = this.server.generation;
+    this.activatedKey = this.activationKey;
+    return result.threadId;
   }
 
-  async listThreads(minds: InstalledMind[]): Promise<NativeThreadSummary[]> {
-    if (!this.server) await this.prepare();
-    const workspaces = await Promise.all([
-      { mindId: this.mind.manifest.id, workspace: this.workspace },
-      ...minds.map((mind) => ({ mindId: mind.manifest.id, workspace: join(this.paths.workspaces, mind.manifest.id) })),
-    ].map(async (item) => {
-      await mkdir(item.workspace, { recursive: true });
-      return item;
-    }));
-    return this.server!.listThreads(workspaces);
-  }
-
-  async newConversation(): Promise<void> {
+  newConversation(): void {
+    this.release();
     this.store.deleteIfEmpty(this.conversation.id);
     this.conversation = this.store.createConversation(
       this.mind.manifest.id,
@@ -100,24 +110,28 @@ export class ChatRuntime {
       this.requestedModel ?? null,
       this.selectedResponseMode,
     );
-    await this.prepare();
+    this.activatedKey = null;
+    this.activatedGeneration = 0;
+    this.threadHasName = false;
+    this.identityHandoffPending = false;
   }
 
-  async setResponseMode(responseMode: ResponseMode): Promise<void> {
+  setResponseMode(responseMode: ResponseMode): void {
     if (responseMode === this.selectedResponseMode) return;
     this.selectedResponseMode = responseMode;
     this.store.setResponseMode(this.conversation.id, responseMode);
     this.conversation = this.store.getConversation(this.conversation.id) ?? this.conversation;
-    if (this.started || this.conversation.codexThreadId) await this.start();
+    this.activatedKey = null;
   }
 
-  async switchMind(mind: InstalledMind): Promise<void> {
+  switchMind(mind: InstalledMind): void {
     if (mind.manifest.id === this.mind.manifest.id) return;
     this.mind = mind;
     this.store.setConversationMind(this.conversation.id, mind.manifest.id, mind.manifest.version);
     this.store.setLastMindId(mind.manifest.id);
     this.conversation = this.store.getConversation(this.conversation.id) ?? this.conversation;
-    if (this.started || this.conversation.codexThreadId) await this.start(true);
+    this.identityHandoffPending = this.conversation.codexThreadId !== null;
+    this.activatedKey = null;
   }
 
   async ask(
@@ -125,37 +139,47 @@ export class ChatRuntime {
     onDelta: (delta: string) => void,
     persistUser = true,
     onUserPersisted?: () => void,
-  ): Promise<{ text: string; status: MessageStatus }> {
+  ): Promise<{ text: string; status: MessageStatus; error?: string }> {
+    let history = this.store.messages(this.conversation.id);
+    if (!persistUser && !this.currentConversation.codexThreadId) {
+      const retriedPrompt = history.findLastIndex((message) => message.role === "user" && message.content === text);
+      if (retriedPrompt >= 0) history = history.slice(0, retriedPrompt);
+    }
+    if (persistUser) {
+      this.store.addMessage(this.conversation.id, "user", text);
+      onUserPersisted?.();
+    }
     try {
-      if (!this.started) await this.start();
-      if (persistUser) {
-        this.store.addMessage(this.conversation.id, "user", text);
-        onUserPersisted?.();
+      const threadId = await this.ensureThread(history);
+      if (!this.threadHasName) {
+        this.threadHasName = true;
+        void this.server.setThreadName(threadId, text).catch(() => {
+          this.threadHasName = false;
+        });
       }
-      const result = await this.server!.turn(text, onDelta);
-      if (this.pendingThreadId) {
-        this.store.setCodexThreadId(this.conversation.id, this.pendingThreadId);
-        this.pendingThreadId = null;
-        this.conversation = this.store.getConversation(this.conversation.id) ?? this.conversation;
+      const result = await this.server.turn(threadId, text, onDelta);
+      if (result.text) {
+        this.store.addMessage(this.conversation.id, "mind", result.text, result.status, this.mind.manifest.id);
       }
-      const output = result.text || result.error || "The turn ended without a response.";
-      this.store.addMessage(this.conversation.id, "mind", output, result.status, this.mind.manifest.id);
-      return { text: output, status: result.status };
+      if (result.status === "failed") {
+        return { text: result.text, status: "failed", error: result.error ?? "The response failed." };
+      }
+      return { text: result.text, status: result.status, error: result.error };
     } catch (error) {
+      this.activatedKey = null;
       const output = error instanceof Error ? error.message : String(error);
-      this.store.addMessage(this.conversation.id, "mind", output, "failed", this.mind.manifest.id);
-      return { text: output, status: "failed" };
+      return { text: "", status: "failed", error: output };
     }
   }
 
   async interrupt(): Promise<void> {
-    await this.server?.interrupt();
+    await this.server.interrupt();
   }
 
-  close(): void {
-    this.server?.close();
-    this.server = null;
-    this.started = false;
-    this.pendingThreadId = null;
+  release(): void {
+    const threadId = this.currentConversation.codexThreadId;
+    this.activatedKey = null;
+    this.activatedGeneration = 0;
+    if (threadId) void this.server.unsubscribe(threadId).catch(() => undefined);
   }
 }

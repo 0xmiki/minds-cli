@@ -174,8 +174,8 @@ export class ConversationStore {
   }
 
   setConversationMind(conversationId: string, mindId: string, mindVersion: string): void {
-    this.database.query("UPDATE conversations SET mind_id = ?, mind_version = ?, updated_at = ? WHERE id = ?")
-      .run(mindId, mindVersion, new Date().toISOString(), conversationId);
+    this.database.query("UPDATE conversations SET mind_id = ?, mind_version = ? WHERE id = ?")
+      .run(mindId, mindVersion, conversationId);
   }
 
   upsertNativeThread(thread: NativeThreadSummary, mindVersion: string): Conversation {
@@ -199,6 +199,11 @@ export class ConversationStore {
   messageCount(conversationId: string): number {
     const row = this.database.query("SELECT COUNT(*) AS count FROM messages WHERE conversation_id = ?").get(conversationId) as { count: number };
     return row.count;
+  }
+
+  messageCounts(): Map<string, number> {
+    const rows = this.database.query("SELECT conversation_id, COUNT(*) AS count FROM messages GROUP BY conversation_id").all() as Array<{ conversation_id: string; count: number }>;
+    return new Map(rows.map((row) => [row.conversation_id, row.count]));
   }
 
   deleteIfEmpty(conversationId: string): void {
@@ -247,8 +252,8 @@ export class ConversationStore {
   }
 
   setResponseMode(conversationId: string, responseMode: ResponseMode): void {
-    this.database.query("UPDATE conversations SET response_mode = ?, updated_at = ? WHERE id = ?")
-      .run(responseMode, new Date().toISOString(), conversationId);
+    this.database.query("UPDATE conversations SET response_mode = ? WHERE id = ?")
+      .run(responseMode, conversationId);
   }
 
   setLastMindId(mindId: string): void {

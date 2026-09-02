@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { MINDS_VERSION } from "./version.ts";
 import { isAbsolute, resolve } from "node:path";
 import { completionScript } from "./completions.ts";
 import { getInstalledMind, installMind, listInstalledMinds, removeMind } from "./mind.ts";
@@ -7,7 +8,7 @@ import { ConversationStore } from "./storage.ts";
 import { runChat } from "./tui/index.tsx";
 import type { ResponseMode } from "./types.ts";
 
-const HELP = `minds 0.3.1
+const HELP = `minds ${MINDS_VERSION}
 
 Usage:
   minds                         Open the last-used mind in a new conversation
@@ -55,7 +56,7 @@ export async function runCli(args = process.argv.slice(2)): Promise<number> {
     return 0;
   }
   if (command === "--version" || command === "-v") {
-    console.log("0.3.1");
+    console.log(MINDS_VERSION);
     return 0;
   }
 

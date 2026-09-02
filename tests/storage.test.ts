@@ -22,8 +22,9 @@ test("persists version-pinned conversations and completed messages", async () =>
   assert.equal(latest?.codexThreadId, null);
   store.setCodexThreadId(conversation.id, "codex-thread-1");
   assert.equal(store.findByCodexThreadId("codex-thread-1")?.id, conversation.id);
-  store.setResponseMode(conversation.id, "chat");
-  assert.equal(store.getConversation(conversation.id)?.responseMode, "chat");
+  const activityTime = store.getConversation(conversation.id)?.updatedAt;
+  store.setResponseMode(conversation.id, "full");
+  assert.equal(store.getConversation(conversation.id)?.responseMode, "full");
   store.setLastMindId("Claude_Shannon");
   assert.equal(store.lastMindId(), "Claude_Shannon");
   const blank = store.createConversation("Claude_Shannon", "0.1.0");
@@ -31,8 +32,10 @@ test("persists version-pinned conversations and completed messages", async () =>
   assert.equal(store.getConversation(blank.id), null);
   assert.deepEqual(store.messages(conversation.id).map((message) => message.status), ["completed", "completed", "interrupted"]);
   assert.deepEqual(store.messages(conversation.id).map((message) => message.mindId), [null, "Claude_Shannon", "Claude_Shannon"]);
+  assert.equal(store.messageCounts().get(conversation.id), 3);
   store.setConversationMind(conversation.id, "Nikola_Tesla", "0.1.0");
   assert.equal(store.getConversation(conversation.id)?.mindId, "Nikola_Tesla");
+  assert.equal(store.getConversation(conversation.id)?.updatedAt, activityTime);
   store.close();
 });
 
