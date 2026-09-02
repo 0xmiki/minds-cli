@@ -52,13 +52,11 @@ export function ThreadSwitcher(props: ThreadSwitcherProps) {
       flexShrink={0}
       flexDirection="column"
       backgroundColor={theme.panel}
-      border={["left"]}
-      borderColor={theme.primary}
       paddingTop={1}
       paddingBottom={1}
     >
       <box height={1} flexShrink={0} flexDirection="row" paddingLeft={2} paddingRight={2}>
-        <text width={10} fg={theme.primary} attributes={TextAttributes.BOLD}>RESUME</text>
+        <text width={10} fg={theme.accent} attributes={TextAttributes.BOLD}>RESUME</text>
         <input
           id="thread-switcher-input"
           ref={(value) => { input = value; }}
@@ -70,7 +68,7 @@ export function ThreadSwitcher(props: ThreadSwitcherProps) {
           focusedBackgroundColor={theme.panel}
           textColor={theme.text}
           focusedTextColor={theme.text}
-          cursorColor={theme.primary}
+          cursorColor={theme.accent}
           cursorStyle={{ style: "block", blinking: false }}
           onKeyDown={(key) => {
             if (key.name === "escape") {
@@ -123,10 +121,10 @@ export function ThreadSwitcher(props: ThreadSwitcherProps) {
             >
               <box height={1} flexDirection="row" justifyContent="space-between">
                 <text fg={active() ? theme.text : theme.textMuted} attributes={active() ? TextAttributes.BOLD : undefined}>
-                  <span style={{ fg: active() ? theme.primary : theme.textMuted }}>{active() ? "› " : "  "}</span>
+                  <span style={{ fg: active() ? theme.accent : theme.textMuted }}>{active() ? "› " : "  "}</span>
                   {item.conversation.title ?? "Untitled conversation"}
                 </text>
-                <text fg={current() ? theme.primary : theme.textMuted}>{current() ? "current" : relativeAge(item.conversation.updatedAt)}</text>
+                <text fg={current() ? theme.accent : theme.textMuted}>{current() ? "current" : relativeAge(item.conversation.updatedAt)}</text>
               </box>
               <text fg={theme.textMuted}>  {props.messageCount(item.conversation.id)} messages  ·  {item.conversation.responseMode}</text>
             </box>

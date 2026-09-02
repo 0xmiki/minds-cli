@@ -6,6 +6,11 @@ import { splitRichContent, unicodeTexBackend } from "./math.ts";
 
 registerTex();
 
+function needsMarkdownRenderer(content: string): boolean {
+  return /(^|\n)\s*(#{1,6}\s|[-*+]\s|\d+\.\s|>\s|```|~~~|\|)/.test(content)
+    || /(\*\*|__|~~|`|\[[^\]]+\]\([^)]+\))/.test(content);
+}
+
 export interface MindMarkdownProps {
   content: string;
   streaming?: boolean;
@@ -33,7 +38,7 @@ export function MindMarkdown(props: MindMarkdownProps) {
               heightMax={24}
             />
           </box>
-        ) : (
+        ) : needsMarkdownRenderer(block.content) ? (
           <markdown
             ref={props.ref}
             width="100%"
@@ -51,6 +56,8 @@ export function MindMarkdown(props: MindMarkdownProps) {
               borderColor: theme.border,
             }}
           />
+        ) : (
+          <text width="100%" fg={theme.text}>{block.content}</text>
         )}
       </For>
     </box>

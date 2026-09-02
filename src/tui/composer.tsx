@@ -1,13 +1,10 @@
-import { Show, createEffect, createSignal, onCleanup } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { RenderableEvents, TextAttributes, type TextareaRenderable } from "@opentui/core";
-import { useRenderer } from "@opentui/solid";
-import type { ResponseMode } from "../types.ts";
+import { useRenderer, useTerminalDimensions } from "@opentui/solid";
 import { theme } from "./theme.ts";
 
 interface ComposerProps {
   mindName: string;
-  model: string | null;
-  responseMode: ResponseMode;
   status: string;
   busy: boolean;
   commandOpen: boolean;
@@ -19,9 +16,15 @@ interface ComposerProps {
 
 export function Composer(props: ComposerProps) {
   const renderer = useRenderer();
+  const dimensions = useTerminalDimensions();
   let input: TextareaRenderable | undefined;
   const [focusVersion, setFocusVersion] = createSignal(0);
   const isActive = () => props.active !== false;
+  const sidePadding = createMemo(() => dimensions().width < 72 ? 2 : 3);
+  const labelWidth = createMemo(() => {
+    const maximum = dimensions().width < 72 ? 18 : 24;
+    return Math.min(maximum, Math.max(12, props.mindName.length + 2));
+  });
   const interceptSubmit = (sequence: string) => {
     if (!isActive() || !input?.focused) return false;
     const submit = sequence === "\r" || sequence === "\n" || sequence === "\x1b[13u" || sequence === "\x1b[13;1u";
@@ -60,17 +63,26 @@ export function Composer(props: ComposerProps) {
   return (
     <box
       width="100%"
-      height={6}
+      height={3}
       flexShrink={0}
-      flexDirection="column"
-      border={["left"]}
-      borderColor={props.busy ? theme.primaryMuted : theme.user}
+      flexDirection="row"
+      alignItems="center"
       backgroundColor={theme.panel}
-      paddingLeft={2}
-      paddingRight={1}
-      paddingTop={1}
-      paddingBottom={1}
+      paddingLeft={sidePadding()}
+      paddingRight={sidePadding()}
     >
+      <text
+        width={labelWidth()}
+        height={1}
+        flexShrink={0}
+        fg={props.busy ? theme.primaryMuted : theme.accent}
+        attributes={TextAttributes.BOLD}
+      >
+        {props.mindName}
+      </text>
+
+      <text width={3} height={1} flexShrink={0} fg={theme.borderActive}> │ </text>
+
       <textarea
         id="mind-composer-input"
         ref={(renderable) => {
@@ -86,8 +98,10 @@ export function Composer(props: ComposerProps) {
           }, 0);
         }}
         width="100%"
+        flexGrow={1}
+        minWidth={0}
         minHeight={1}
-        maxHeight={2}
+        maxHeight={1}
         wrapMode="word"
         backgroundColor={theme.panel}
         focusedBackgroundColor={theme.panel}
@@ -105,27 +119,6 @@ export function Composer(props: ComposerProps) {
         onContentChange={() => props.onInput(input?.plainText ?? "")}
         onSubmit={props.onSubmit}
       />
-
-      <box height={1} flexShrink={0} />
-
-      <box height={1} flexShrink={0} flexDirection="row" justifyContent="space-between">
-        <Show
-          when={props.status === "ready"}
-          fallback={<text fg={props.busy ? theme.primary : theme.textMuted}>{props.status}</text>}
-        >
-          <text>
-            <span style={{ fg: theme.primary, attributes: TextAttributes.BOLD }}>◆ {props.mindName}</span>
-            <span style={{ fg: theme.textMuted }}>  ·  {props.model ?? "Codex"}  ·  {props.responseMode}</span>
-          </text>
-        </Show>
-        <text fg={theme.textMuted}>
-          {props.commandOpen
-            ? "type to filter  ·  enter run  ·  esc close"
-            : props.busy
-              ? "type next prompt  ·  esc interrupt"
-              : "enter send  ·  / commands"}
-        </text>
-      </box>
     </box>
   );
 }

@@ -1,5 +1,6 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import {
+  TextAttributes,
   type ScrollBoxRenderable,
   type TextareaRenderable,
 } from "@opentui/core";
@@ -19,6 +20,7 @@ import { theme } from "./theme.ts";
 
 interface ChatProps {
   mind: InstalledMind;
+  minds?: InstalledMind[];
   store: ConversationStore;
   paths: MindsPaths;
   fresh?: boolean;
@@ -32,35 +34,34 @@ function duration(milliseconds: number): string {
   return `${Math.floor(milliseconds / 60_000)}m ${Math.round((milliseconds % 60_000) / 1_000)}s`;
 }
 
-function UserMessage(props: { message: Message }) {
+export function UserMessage(props: { message: Message }) {
   return (
     <box
       width="100%"
-      marginTop={1}
-      border={["left"]}
-      borderColor={theme.user}
-      backgroundColor={theme.panel}
-      paddingTop={1}
-      paddingBottom={1}
-      paddingLeft={2}
+      flexDirection="row"
+      justifyContent="flex-end"
+      marginTop={2}
+      marginBottom={1}
       paddingRight={1}
     >
-      <text fg={theme.text}>{props.message.content}</text>
+      <text maxWidth="72%" fg={theme.text} wrapMode="word">{props.message.content}</text>
     </box>
   );
 }
 
-function MindMessage(props: { mindName: string; message: Message; model: string | null }) {
-  const marker = () => props.message.status === "completed" ? "◆" : props.message.status === "interrupted" ? "◇" : "×";
-  const markerColor = () => props.message.status === "failed" ? theme.error : props.message.status === "interrupted" ? theme.textMuted : theme.primary;
-  const time = () => new Date(props.message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+export function MindMessage(props: { mindName: string; message: Message }) {
   return (
-    <box width="100%" flexDirection="column" paddingLeft={2} paddingRight={1} marginTop={1}>
+    <box width="100%" flexDirection="column" paddingLeft={1} paddingRight={1} marginTop={2} marginBottom={1}>
+      <text fg={theme.accent} marginBottom={1}>{props.mindName}</text>
       <MindMarkdown content={props.message.content} />
-      <text fg={theme.textMuted} marginTop={1}>
-        <span style={{ fg: markerColor() }}>{marker()} </span>
-        {props.mindName}  ·  {props.model ?? "Codex"}  ·  {time()}
-      </text>
+    </box>
+  );
+}
+
+export function EmptyConversation(props: { mindName: string }) {
+  return (
+    <box width="100%" alignItems="center" justifyContent="center">
+      <text fg={theme.text} attributes={TextAttributes.BOLD}>Ask {props.mindName}</text>
     </box>
   );
 }
@@ -88,7 +89,7 @@ export function Chat(props: ChatProps) {
   const [commandIndex, setCommandIndex] = createSignal(0);
   const [mindSwitcherOpen, setMindSwitcherOpen] = createSignal(false);
   const [threadSwitcherOpen, setThreadSwitcherOpen] = createSignal(false);
-  const [availableMinds, setAvailableMinds] = createSignal<InstalledMind[]>([props.mind]);
+  const [availableMinds, setAvailableMinds] = createSignal<InstalledMind[]>(props.minds ?? [props.mind]);
   const [availableConversations, setAvailableConversations] = createSignal<Conversation[]>([]);
   let input: TextareaRenderable | undefined;
   let scroll: ScrollBoxRenderable | undefined;
@@ -96,8 +97,12 @@ export function Chat(props: ChatProps) {
   let streamFlushTimer: ReturnType<typeof setTimeout> | undefined;
   let pendingStream = "";
 
-  const contentWidth = createMemo(() => Math.min(112, Math.max(24, dimensions().width - 6)));
-  const emptyComposerWidth = createMemo(() => Math.min(84, contentWidth()));
+  const contentWidth = createMemo(() => dimensions().width < 100
+    ? Math.max(24, dimensions().width - (dimensions().width < 72 ? 2 : 4))
+    : Math.min(154, Math.max(24, Math.floor(dimensions().width * 0.82))));
+  const emptyComposerWidth = createMemo(() => Math.min(104, contentWidth()));
+  const bottomInset = createMemo(() => dimensions().height < 32 ? 1 : 2);
+  const compactHeader = createMemo(() => dimensions().width < 72);
   const emptyThread = createMemo(() => messages().length === 0 && !streaming() && !error());
   const thinkingLabel = createMemo(() => busy() && status() === "thinking" ? `thinking  ${duration(elapsed())}` : status());
   const matchingCommands = createMemo(() => filterSlashCommands(composerValue()));
@@ -384,6 +389,7 @@ export function Chat(props: ChatProps) {
     if (commandOpen() && key.name === "down") {
       setCommandIndex((value) => (value + 1) % matchingCommands().length);
     }
+    if (key.ctrl && key.name === "q") return renderer.destroy();
     if ((key.ctrl && key.name === "c") && !busy()) return renderer.destroy();
     if ((key.ctrl && key.name === "c") || (key.name === "escape" && busy())) {
       setStatus("interrupting");
@@ -428,35 +434,43 @@ export function Chat(props: ChatProps) {
     scrollToBottom();
   });
 
-  const InputArea = () => (
-    <box width="100%" flexDirection="column">
+  const Overlays = () => (
+    <>
       <Show when={mindSwitcherOpen()}>
-        <MindSwitcher
-          minds={availableMinds()}
-          currentId={mind().manifest.id}
-          onSelect={(selectedMind) => { void switchMind(selectedMind); }}
-          onClose={closeMindSwitcher}
-        />
+        <box position="absolute" left={0} bottom={3 + bottomInset()} width="100%" zIndex={20}>
+          <MindSwitcher
+            minds={availableMinds()}
+            currentId={mind().manifest.id}
+            onSelect={(selectedMind) => { void switchMind(selectedMind); }}
+            onClose={closeMindSwitcher}
+          />
+        </box>
       </Show>
 
       <Show when={threadSwitcherOpen()}>
-        <ThreadSwitcher
-          conversations={availableConversations()}
-          currentId={runtime.id}
-          messageCount={(conversationId) => props.store.messageCount(conversationId)}
-          onSelect={(selectedConversation) => { void resumeConversation(selectedConversation); }}
-          onClose={closeThreadSwitcher}
-        />
+        <box position="absolute" left={0} bottom={3 + bottomInset()} width="100%" zIndex={20}>
+          <ThreadSwitcher
+            conversations={availableConversations()}
+            currentId={runtime.id}
+            messageCount={(conversationId) => props.store.messageCount(conversationId)}
+            onSelect={(selectedConversation) => { void resumeConversation(selectedConversation); }}
+            onClose={closeThreadSwitcher}
+          />
+        </box>
       </Show>
 
       <Show when={commandOpen()}>
-        <CommandPalette commands={matchingCommands()} selected={commandIndex()} />
+        <box position="absolute" left={0} bottom={3 + bottomInset()} width="100%" zIndex={20}>
+          <CommandPalette commands={matchingCommands()} selected={commandIndex()} />
+        </box>
       </Show>
+    </>
+  );
 
+  const InputArea = () => (
+    <box width="100%" height={3} flexShrink={0}>
       <Composer
         mindName={mind().manifest.name}
-        model={model()}
-        responseMode={responseMode()}
         status={thinkingLabel()}
         busy={busy()}
         commandOpen={commandOpen()}
@@ -472,10 +486,28 @@ export function Chat(props: ChatProps) {
   );
 
   return (
-    <box width="100%" height="100%" backgroundColor={theme.background} alignItems="center">
-      <box width={contentWidth()} height="100%" minWidth={0} flexDirection="column">
-        <Show when={emptyThread()} fallback={
-          <>
+    <box width="100%" height="100%" backgroundColor={theme.background} flexDirection="column">
+      <box
+        width="100%"
+        height={3}
+        flexShrink={0}
+        flexDirection="row"
+        backgroundColor={theme.background}
+        paddingLeft={2}
+        paddingRight={2}
+        alignItems="center"
+        justifyContent="flex-end"
+      >
+        <text fg={theme.textMuted}>
+          {busy()
+            ? compactHeader() ? "[Esc] stop" : `[Esc] stop  ·  ${thinkingLabel()}`
+            : compactHeader() ? "[/]  [Ctrl+Q]" : "[/] commands  [Ctrl+Q] quit"}
+        </text>
+      </box>
+
+      <box width="100%" flexGrow={1} minHeight={0} alignItems="center">
+        <box width={contentWidth()} height="100%" minWidth={0} flexDirection="column" paddingBottom={bottomInset()}>
+          <Show when={emptyThread()} fallback={
             <scrollbox
               ref={(value) => { scroll = value; }}
               width="100%"
@@ -490,38 +522,39 @@ export function Chat(props: ChatProps) {
                 trackOptions: { backgroundColor: theme.panel, foregroundColor: theme.borderActive },
               }}
             >
-              <box height={1} />
+              <box height={2} />
               <For each={messages()}>
                 {(message) => message.role === "user"
                   ? <UserMessage message={message} />
-                  : <MindMessage mindName={messageMindName(message)} message={message} model={model()} />}
+                  : <MindMessage mindName={messageMindName(message)} message={message} />}
               </For>
 
-              <Show when={streaming()}>
-                <box width="100%" flexDirection="column" paddingLeft={2} paddingRight={1} marginTop={1}>
-                  <MindMarkdown content={streaming()} streaming />
-                  <text fg={theme.textMuted} marginTop={1}>
-                    <span style={{ fg: theme.primary }}>◆ </span>{mind().manifest.name}  ·  {thinkingLabel()}
-                  </text>
+              <Show when={busy()}>
+                <box width="100%" flexDirection="column" paddingLeft={1} paddingRight={1} marginTop={2} marginBottom={1}>
+                  <text fg={theme.accent} marginBottom={1}>{mind().manifest.name}</text>
+                  <Show when={streaming()} fallback={<text fg={theme.textMuted}>{thinkingLabel()}</text>}>
+                    <MindMarkdown content={streaming()} streaming />
+                  </Show>
                 </box>
               </Show>
 
               <Show when={error()}>
-                <box border={["left"]} borderColor={theme.error} backgroundColor={theme.panel} padding={1} marginTop={1}>
+                <box backgroundColor={theme.panel} padding={1} marginTop={1}>
                   <text fg={theme.error}>{error()}</text>
                 </box>
               </Show>
-              <box height={1} />
+              <box height={2} />
             </scrollbox>
-            <InputArea />
-          </>
-        }>
-          <box width="100%" flexGrow={1} flexDirection="column" alignItems="center" justifyContent="center">
-            <box width={emptyComposerWidth()} flexDirection="column">
-              <InputArea />
+          }>
+            <box width="100%" flexGrow={1} flexDirection="column" alignItems="center" justifyContent="center">
+              <box width={emptyComposerWidth()} flexDirection="column">
+                <EmptyConversation mindName={mind().manifest.name} />
+              </box>
             </box>
-          </box>
-        </Show>
+          </Show>
+          <Overlays />
+          <InputArea />
+        </box>
       </box>
     </box>
   );

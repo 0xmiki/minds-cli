@@ -11,6 +11,7 @@ import { renderInlineMath, splitRichContent } from "../src/tui/math.ts";
 import { Composer } from "../src/tui/composer.tsx";
 import { MindSwitcher } from "../src/tui/mind-switcher.tsx";
 import { ThreadSwitcher } from "../src/tui/thread-switcher.tsx";
+import { EmptyConversation, MindMessage, UserMessage } from "../src/tui/chat.tsx";
 import type { InputRenderable, TextareaRenderable } from "@opentui/core";
 import { ConversationStore } from "../src/storage.ts";
 
@@ -184,7 +185,53 @@ test("renders display and inline TeX without raw delimiters", async () => {
   }
 });
 
-test("keeps a tall placeholder-free composer focused", async () => {
+test("renders the quiet conversation layout", async () => {
+  const now = new Date().toISOString();
+  const setup = await testRender(
+    () => (
+      <box width="100%" height="100%" flexDirection="column">
+        <box height={4}><EmptyConversation mindName="Claude Shannon" /></box>
+        <box height={5}><UserMessage message={{ id: 1, conversationId: "one", mindId: null, role: "user", content: "What is information?", status: "completed", createdAt: now }} /></box>
+        <box height={10}><MindMessage mindName="Claude Shannon" message={{ id: 2, conversationId: "one", mindId: "Claude_Shannon", role: "mind", content: "A reduction in uncertainty.", status: "completed", createdAt: now }} /></box>
+      </box>
+    ),
+    { width: 100, height: 32 },
+  );
+  try {
+    await setup.renderOnce();
+    const frame = setup.captureCharFrame();
+    expect(frame).toContain("Ask Claude Shannon");
+    expect(frame).toContain("What is information?");
+    expect(frame).toContain("Claude Shannon");
+    const userLine = frame.split("\n").find((line) => line.includes("What is information?"));
+    expect(userLine?.indexOf("What is information?")).toBeGreaterThan(70);
+    expect(frame).not.toContain("Codex");
+    expect(frame).not.toContain("◆");
+  } finally {
+    setup.renderer.destroy();
+  }
+});
+
+test("renders a plain mind reply beneath its name", async () => {
+  const now = new Date().toISOString();
+  const setup = await testRender(
+    () => (
+      <box width="100%" height="100%">
+        <MindMessage mindName="Claude Shannon" message={{ id: 1, conversationId: "one", mindId: "Claude_Shannon", role: "mind", content: "A reduction in uncertainty.", status: "completed", createdAt: now }} />
+      </box>
+    ),
+    { width: 80, height: 10 },
+  );
+  try {
+    const frame = await setup.waitForFrame((value) => value.includes("A reduction in uncertainty."), { maxPasses: 1_000 });
+    expect(frame).toContain("Claude Shannon");
+    expect(frame).toContain("A reduction in uncertainty.");
+  } finally {
+    setup.renderer.destroy();
+  }
+});
+
+test("keeps the minimal composer focused", async () => {
   let submissions = 0;
   const setup = await testRender(
     () => (
@@ -194,8 +241,6 @@ test("keeps a tall placeholder-free composer focused", async () => {
         </box>
         <Composer
           mindName="Claude Shannon"
-          model="gpt-5.6-sol"
-          responseMode="full"
           status="ready"
           busy={false}
           commandOpen={false}
@@ -211,10 +256,9 @@ test("keeps a tall placeholder-free composer focused", async () => {
     await setup.renderOnce();
     const frame = setup.captureCharFrame();
     expect(frame).toContain("Claude Shannon");
-    expect(frame).toContain("gpt-5.6-sol");
-    expect(frame).toContain("full");
-    expect(frame).toContain("enter send");
-    expect(frame).not.toContain("Ask Claude Shannon");
+    expect(frame).not.toContain("Write a message...");
+    expect(frame).not.toContain("gpt-5.6-sol");
+    expect(frame).not.toContain("enter send");
     const input = setup.renderer.root.findDescendantById("mind-composer-input") as TextareaRenderable;
     await Bun.sleep(10);
     await setup.renderOnce();

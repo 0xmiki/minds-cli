@@ -10,8 +10,6 @@ export function CommandPalette(props: { commands: SlashCommand[]; selected: numb
       flexShrink={0}
       flexDirection="column"
       backgroundColor={theme.panel}
-      border={["left"]}
-      borderColor={theme.primary}
       paddingTop={1}
       paddingBottom={1}
     >
@@ -27,7 +25,7 @@ export function CommandPalette(props: { commands: SlashCommand[]; selected: numb
               paddingLeft={2}
               paddingRight={2}
             >
-              <text width={12} fg={active() ? theme.primary : theme.text} attributes={active() ? TextAttributes.BOLD : undefined}>
+              <text width={12} fg={active() ? theme.accent : theme.text} attributes={active() ? TextAttributes.BOLD : undefined}>
                 {active() ? "› " : "  "}{command.name}
               </text>
               <text fg={theme.textMuted}>{command.description}</text>

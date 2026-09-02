@@ -77,22 +77,19 @@ export function Picker(props: PickerProps) {
     >
       <box width={width()} flexDirection="column" gap={1}>
         <box flexDirection="column" alignItems="center" marginBottom={1}>
-          <text fg={theme.primary} attributes={TextAttributes.BOLD}>minds</text>
+          <text fg={theme.accent} attributes={TextAttributes.BOLD}>minds</text>
           <text fg={theme.textMuted}>choose a mind</text>
         </box>
 
         <box
           width="100%"
           height={3}
-          border
-          borderStyle="rounded"
-          borderColor={theme.borderActive}
           backgroundColor={theme.panel}
           paddingLeft={1}
           paddingRight={1}
           alignItems="center"
         >
-          <text fg={theme.primary}>› </text>
+          <text fg={theme.accent}>› </text>
           <input
             ref={(value) => { input = value; }}
             width="100%"
@@ -103,7 +100,7 @@ export function Picker(props: PickerProps) {
             focusedBackgroundColor={theme.panel}
             textColor={theme.text}
             focusedTextColor={theme.text}
-            cursorColor={theme.primary}
+            cursorColor={theme.accent}
             onInput={(value) => {
               setQuery(value);
               setSelected(0);
@@ -134,8 +131,6 @@ export function Picker(props: PickerProps) {
                   flexDirection="column"
                   justifyContent="center"
                   backgroundColor={active() ? theme.panelRaised : theme.background}
-                  border={active() ? ["left"] : false}
-                  borderColor={theme.primary}
                 >
                   <box height={1} flexShrink={0} flexDirection="row" justifyContent="space-between">
                     <text fg={active() ? theme.text : theme.textMuted} attributes={active() ? TextAttributes.BOLD : undefined}>

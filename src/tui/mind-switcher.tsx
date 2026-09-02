@@ -58,13 +58,11 @@ export function MindSwitcher(props: MindSwitcherProps) {
       flexShrink={0}
       flexDirection="column"
       backgroundColor={theme.panel}
-      border={["left"]}
-      borderColor={theme.primary}
       paddingTop={1}
       paddingBottom={1}
     >
       <box height={1} flexShrink={0} flexDirection="row" paddingLeft={2} paddingRight={2}>
-        <text width={10} fg={theme.primary} attributes={TextAttributes.BOLD}>MINDS</text>
+        <text width={10} fg={theme.accent} attributes={TextAttributes.BOLD}>MINDS</text>
         <input
           id="mind-switcher-input"
           ref={(value) => { input = value; }}
@@ -76,7 +74,7 @@ export function MindSwitcher(props: MindSwitcherProps) {
           focusedBackgroundColor={theme.panel}
           textColor={theme.text}
           focusedTextColor={theme.text}
-          cursorColor={theme.primary}
+          cursorColor={theme.accent}
           cursorStyle={{ style: "block", blinking: false }}
           onKeyDown={(key) => {
             if (key.name === "escape") {
@@ -128,10 +126,10 @@ export function MindSwitcher(props: MindSwitcherProps) {
               paddingRight={2}
             >
               <text fg={active() ? theme.text : theme.textMuted} attributes={active() ? TextAttributes.BOLD : undefined}>
-                <span style={{ fg: active() ? theme.primary : theme.textMuted }}>{active() ? "› " : "  "}</span>
+                <span style={{ fg: active() ? theme.accent : theme.textMuted }}>{active() ? "› " : "  "}</span>
                 {item.entry.mind.manifest.name}
               </text>
-              <text fg={current() ? theme.primary : theme.textMuted}>{current() ? "current" : item.entry.mind.manifest.id}</text>
+              <text fg={current() ? theme.accent : theme.textMuted}>{current() ? "current" : item.entry.mind.manifest.id}</text>
             </box>
           );
         }}

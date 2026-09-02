@@ -1,5 +1,6 @@
 import { render } from "@opentui/solid";
 import type { MindsPaths } from "../paths.ts";
+import { listInstalledMinds } from "../mind.ts";
 import { ConversationStore } from "../storage.ts";
 import type { InstalledMind, ResponseMode } from "../types.ts";
 import { Chat } from "./chat.tsx";
@@ -34,5 +35,6 @@ export async function runChat(
   paths: MindsPaths,
   options: { fresh?: boolean; model?: string; responseMode?: ResponseMode } = {},
 ): Promise<void> {
-  await mount(() => <Chat mind={mind} store={store} paths={paths} {...options} />);
+  const minds = await listInstalledMinds(paths.minds);
+  await mount(() => <Chat mind={mind} minds={minds} store={store} paths={paths} {...options} />);
 }
