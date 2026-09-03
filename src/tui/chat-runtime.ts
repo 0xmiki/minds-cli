@@ -54,7 +54,6 @@ export class ChatRuntime {
     return [
       this.currentConversation.codexThreadId ?? "new",
       this.mind.manifest.id,
-      this.mind.manifest.version,
       this.selectedResponseMode,
       this.requestedModel ?? this.currentConversation.model ?? "default",
     ].join("\u0000");
@@ -106,7 +105,7 @@ export class ChatRuntime {
     this.store.deleteIfEmpty(this.conversation.id);
     this.conversation = this.store.createConversation(
       this.mind.manifest.id,
-      this.mind.manifest.version,
+      "identity",
       this.requestedModel ?? null,
       this.selectedResponseMode,
     );
@@ -127,7 +126,7 @@ export class ChatRuntime {
   switchMind(mind: InstalledMind): void {
     if (mind.manifest.id === this.mind.manifest.id) return;
     this.mind = mind;
-    this.store.setConversationMind(this.conversation.id, mind.manifest.id, mind.manifest.version);
+    this.store.setConversationMind(this.conversation.id, mind.manifest.id);
     this.store.setLastMindId(mind.manifest.id);
     this.conversation = this.store.getConversation(this.conversation.id) ?? this.conversation;
     this.identityHandoffPending = this.conversation.codexThreadId !== null;

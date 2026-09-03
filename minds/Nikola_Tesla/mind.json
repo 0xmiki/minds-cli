@@ -1,8 +1,7 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "Nikola_Tesla",
   "name": "Nikola Tesla",
-  "version": "0.2.0",
-  "default_language": "en",
-  "core": "core.md"
+  "language": "en",
+  "description": "Serbian-American inventor and electrical engineer"
 }

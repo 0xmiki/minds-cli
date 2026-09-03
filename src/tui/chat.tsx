@@ -6,7 +6,7 @@ import {
 } from "@opentui/core";
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid";
 import { CodexAppServer } from "../codex-app-server.ts";
-import { listInstalledMinds } from "../mind.ts";
+import { getInstalledMind, listInstalledMinds } from "../mind.ts";
 import type { MindsPaths } from "../paths.ts";
 import { ConversationStore } from "../storage.ts";
 import type { Conversation, InstalledMind, Message, MessageStatus, ResponseMode } from "../types.ts";
@@ -70,8 +70,8 @@ export function EmptyConversation(props: { mindName: string }) {
 export function Chat(props: ChatProps) {
   const renderer = useRenderer();
   const dimensions = useTerminalDimensions();
-  let conversation = props.fresh === false ? props.store.latestConversation(props.mind.manifest.id, props.mind.manifest.version) : null;
-  conversation ??= props.store.createConversation(props.mind.manifest.id, props.mind.manifest.version, props.model ?? null, props.responseMode ?? "chat");
+  let conversation = props.fresh === false ? props.store.latestConversation(props.mind.manifest.id) : null;
+  conversation ??= props.store.createConversation(props.mind.manifest.id, "identity", props.model ?? null, props.responseMode ?? "chat");
   const server = new CodexAppServer();
   let runtime = new ChatRuntime(server, props.mind, props.store, props.paths, conversation, props.model, props.responseMode);
 
@@ -198,32 +198,32 @@ export function Chat(props: ChatProps) {
     input?.blur();
   };
 
-  const resumeConversation = (nextConversation: Conversation) => {
+  const resumeConversation = async (nextConversation: Conversation) => {
     if (nextConversation.id === runtime.id) {
       closeThreadSwitcher();
       return;
     }
-    const nextMind = availableMinds().find((candidate) => candidate.manifest.id === nextConversation.mindId);
-    if (!nextMind) {
-      setError(`Mind ${nextConversation.mindId} is not installed`);
+    try {
+      const nextMind = await getInstalledMind(props.paths.minds, nextConversation.mindId);
+      setThreadSwitcherOpen(false);
+      props.store.deleteIfEmpty(runtime.id);
+      runtime.release();
+      runtime = new ChatRuntime(server, nextMind, props.store, props.paths, nextConversation, props.model);
+      setMind(nextMind);
+      setMessages(props.store.messages(runtime.id));
+      setStreaming("");
+      clearStream();
+      setLastRetryablePrompt(null);
+      props.store.setLastMindId(nextMind.manifest.id);
+      setError(null);
+      setStatus("ready");
+      scrollToBottom();
+      input?.focus();
+    } catch {
+      setError(`Mind ${nextConversation.mindId} is not saved`);
       setStatus("cannot resume conversation");
       setThreadSwitcherOpen(false);
-      return;
     }
-    setThreadSwitcherOpen(false);
-    props.store.deleteIfEmpty(runtime.id);
-    runtime.release();
-    runtime = new ChatRuntime(server, nextMind, props.store, props.paths, nextConversation, props.model);
-    setMind(nextMind);
-    setMessages(props.store.messages(runtime.id));
-    setStreaming("");
-    clearStream();
-    setLastRetryablePrompt(null);
-    props.store.setLastMindId(nextMind.manifest.id);
-    setError(null);
-    setStatus("ready");
-    scrollToBottom();
-    input?.focus();
   };
 
   const switchMind = (nextMind: InstalledMind) => {

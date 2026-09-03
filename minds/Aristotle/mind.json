@@ -1,8 +1,7 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "Aristotle",
   "name": "Aristotle",
-  "version": "0.1.0",
-  "default_language": "en",
-  "core": "core.md"
+  "language": "en",
+  "description": "Ancient Greek philosopher and polymath"
 }

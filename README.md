@@ -2,7 +2,7 @@
 
 Talk with the minds that shaped the world, directly from your terminal.
 
-Minds gives each person a small, versioned `core.md` that describes how they think and who they are outside their work. Codex supplies broad knowledge; the core supplies judgment, temperament, humor, and voice.
+Minds relies on the model's existing knowledge of each person. It supplies a small identity cue, a human conversation layer, and a full unslop pass that removes the usual AI-assistant voice.
 
 The MVP includes Aristotle, Claude Shannon, Friedrich Nietzsche, and Nikola Tesla. They are available on first launch.
 
@@ -47,25 +47,27 @@ Inside a conversation:
 
 Threads persist through Codex app-server. Changing minds keeps the same thread, and earlier replies retain their original speaker labels.
 
-## Add a mind
+## Add another mind
 
-A mind is a data-only folder named with its canonical English Wikipedia slug:
-
-```text
-Ada_Lovelace/
-├── mind.json
-└── core.md
-```
-
-`mind.json` contains the ID, name, semantic version, language, and core filename. `core.md` should capture reasoning mechanics and ordinary humanity: standards of evidence, recurring tensions, humor, affection, pride, social rhythm, and what can change the person's mind.
-
-Install a local bundle:
+Save any identity with its canonical English Wikipedia slug:
 
 ```bash
-minds fetch ./path/to/Ada_Lovelace
+minds add Albert_Einstein
 ```
 
-See the bundled minds for complete examples.
+Minds reads the display name and short disambiguation from Wikipedia, then stores one identity record:
+
+```json
+{
+  "schema_version": 2,
+  "id": "Ada_Lovelace",
+  "name": "Ada Lovelace",
+  "language": "en",
+  "description": "English mathematician and writer"
+}
+```
+
+There is no personality specification or `core.md` in the MVP. Changing minds changes the identity cue while keeping the conversation intact. Older v1 bundles remain readable, but their core text is not injected into new conversations.
 
 ## Shell completion
 

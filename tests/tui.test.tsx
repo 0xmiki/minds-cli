@@ -38,6 +38,7 @@ test("renders a centered full-screen mind picker", async () => {
   const mind = {
     directory: join(directory, "Claude_Shannon"),
     core: "Reduce the problem.",
+    coreHash: "shannon-hash",
     manifest: {
       schema_version: 1 as const,
       id: "Claude_Shannon",
@@ -100,11 +101,13 @@ test("renders and selects minds inside chat", async () => {
     {
       directory: "/tmp/Claude_Shannon",
       core: "Reduce the problem.",
+      coreHash: "shannon-hash",
       manifest: { schema_version: 1 as const, id: "Claude_Shannon", name: "Claude Shannon", version: "0.1.0", default_language: "en", core: "core.md" },
     },
     {
       directory: "/tmp/Friedrich_Nietzsche",
       core: "Revalue the value.",
+      coreHash: "nietzsche-hash",
       manifest: { schema_version: 1 as const, id: "Friedrich_Nietzsche", name: "Friedrich Nietzsche", version: "0.1.0", default_language: "en", core: "core.md" },
     },
   ];
@@ -133,8 +136,8 @@ test("renders and selects minds inside chat", async () => {
 test("renders and selects saved conversations", async () => {
   const now = new Date().toISOString();
   const conversations = [
-    { id: "one", codexThreadId: "thread-one", mindId: "Claude_Shannon", mindVersion: "0.1.0", model: "test", responseMode: "chat" as const, title: "Information and uncertainty", createdAt: now, updatedAt: now },
-    { id: "two", codexThreadId: "thread-two", mindId: "Friedrich_Nietzsche", mindVersion: "0.1.0", model: "test", responseMode: "chat" as const, title: "Creating values", createdAt: now, updatedAt: now },
+    { id: "one", codexThreadId: "thread-one", mindId: "Claude_Shannon", mindVersion: "identity", appVersion: "0.4.0", promptContract: 3, model: "test", responseMode: "chat" as const, title: "Information and uncertainty", createdAt: now, updatedAt: now },
+    { id: "two", codexThreadId: "thread-two", mindId: "Friedrich_Nietzsche", mindVersion: "identity", appVersion: "0.4.0", promptContract: 3, model: "test", responseMode: "chat" as const, title: "Creating values", createdAt: now, updatedAt: now },
   ];
   let selected = "";
   const setup = await testRender(

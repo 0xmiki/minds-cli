@@ -1,17 +1,18 @@
 export interface MindManifest {
-  schema_version: 1;
+  schema_version: 1 | 2;
   id: string;
   name: string;
-  version: string;
-  default_language: string;
-  core: string;
+  description?: string;
+  language?: string;
+  version?: string;
+  default_language?: string;
+  core?: string;
   [key: string]: unknown;
 }
 
 export interface InstalledMind {
   manifest: MindManifest;
   directory: string;
-  core: string;
 }
 
 export type MessageRole = "user" | "mind";
@@ -23,6 +24,8 @@ export interface Conversation {
   codexThreadId: string | null;
   mindId: string;
   mindVersion: string;
+  appVersion: string | null;
+  promptContract: number | null;
   model: string | null;
   responseMode: ResponseMode;
   title: string | null;

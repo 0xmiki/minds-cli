@@ -136,10 +136,9 @@ export function Picker(props: PickerProps) {
                     <text fg={active() ? theme.text : theme.textMuted} attributes={active() ? TextAttributes.BOLD : undefined}>
                       {active() ? "› " : "  "}{entry.mind.manifest.name}
                     </text>
-                    <text fg={theme.textMuted}>v{entry.mind.manifest.version}</text>
                   </box>
                   <text height={1} flexShrink={0} fg={theme.textMuted}>
-                    {latest()?.title ? `  continue  ${latest()!.title}` : "  start a new conversation"}
+                    {latest()?.title ? `  continue  ${latest()!.title}` : `  ${entry.mind.manifest.description ?? "start a new conversation"}`}
                   </text>
                 </box>
               );

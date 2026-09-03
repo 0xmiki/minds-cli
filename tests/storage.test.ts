@@ -6,20 +6,22 @@ import test from "node:test";
 import { Database } from "bun:sqlite";
 import { ConversationStore } from "../src/storage.ts";
 
-test("persists version-pinned conversations and completed messages", async () => {
+test("persists runtime metadata and completed messages", async () => {
   const root = await mkdtemp(join(tmpdir(), "minds-storage-"));
   const store = new ConversationStore(join(root, "conversations.sqlite3"));
-  const conversation = store.createConversation("Claude_Shannon", "0.1.0", "test-model");
+  const conversation = store.createConversation("Claude_Shannon", "identity", "test-model", "chat");
   store.addMessage(conversation.id, "user", "What is information?");
   store.addMessage(conversation.id, "mind", "A reduction in uncertainty.", "completed", "Claude_Shannon");
   store.addMessage(conversation.id, "mind", "discarded", "interrupted", "Claude_Shannon");
 
-  const latest = store.latestConversation("Claude_Shannon", "0.1.0");
+  const latest = store.latestConversation("Claude_Shannon", "identity");
   assert.equal(latest?.id, conversation.id);
   assert.equal(latest?.title, "What is information?");
   assert.equal(latest?.model, "test-model");
   assert.equal(latest?.responseMode, "chat");
   assert.equal(latest?.codexThreadId, null);
+  assert.equal(latest?.appVersion, "0.4.0");
+  assert.equal(latest?.promptContract, 3);
   store.setCodexThreadId(conversation.id, "codex-thread-1");
   assert.equal(store.findByCodexThreadId("codex-thread-1")?.id, conversation.id);
   const activityTime = store.getConversation(conversation.id)?.updatedAt;
@@ -33,7 +35,7 @@ test("persists version-pinned conversations and completed messages", async () =>
   assert.deepEqual(store.messages(conversation.id).map((message) => message.status), ["completed", "completed", "interrupted"]);
   assert.deepEqual(store.messages(conversation.id).map((message) => message.mindId), [null, "Claude_Shannon", "Claude_Shannon"]);
   assert.equal(store.messageCounts().get(conversation.id), 3);
-  store.setConversationMind(conversation.id, "Nikola_Tesla", "0.1.0");
+  store.setConversationMind(conversation.id, "Nikola_Tesla");
   assert.equal(store.getConversation(conversation.id)?.mindId, "Nikola_Tesla");
   assert.equal(store.getConversation(conversation.id)?.updatedAt, activityTime);
   store.close();

@@ -135,6 +135,7 @@ async function fixture(timeout = 250) {
 const shannon = {
   directory: "/tmp/Claude_Shannon",
   core: "Reduce a problem to its clean form.",
+  coreHash: "shannon-hash",
   manifest: {
     schema_version: 1 as const,
     id: "Claude_Shannon",
@@ -148,6 +149,7 @@ const shannon = {
 const nietzsche = {
   directory: "/tmp/Friedrich_Nietzsche",
   core: "Create values rather than inherit them.",
+  coreHash: "nietzsche-hash",
   manifest: {
     schema_version: 1 as const,
     id: "Friedrich_Nietzsche",
@@ -249,8 +251,9 @@ test("reuses one process while conversations, minds, and response modes change",
     expect(log.filter((item) => item.method === "thread/start")).toHaveLength(2);
     const resumes = log.filter((item) => item.method === "thread/resume");
     expect(resumes).toHaveLength(2);
-    expect(resumes[0]?.params.baseInstructions).toContain("<core>");
-    expect(resumes[0]?.params.baseInstructions).not.toContain("<response_mode>");
+    expect(resumes[0]?.params.baseInstructions).not.toContain("<core>");
+    expect(resumes[0]?.params.baseInstructions).not.toContain("Reduce a problem to its clean form");
+    expect(resumes[0]?.params.baseInstructions).toContain("Develop the answer");
     expect(resumes[1]?.params.baseInstructions).toContain("You are Friedrich Nietzsche");
     expect(resumes[1]?.params.baseInstructions).toContain("<identity_handoff>");
   } finally {
@@ -262,7 +265,7 @@ test("does not attribute transport failures to a mind or duplicate a retried pro
   const { root, log, server } = await fixture();
   const store = new ConversationStore(join(root, "conversations.sqlite3"));
   const paths = { data: root, minds: join(root, "minds"), database: join(root, "conversations.sqlite3"), workspaces: join(root, "workspaces") };
-  const fragileMind = { ...shannon, core: "Fail once" };
+  const fragileMind = { ...shannon, manifest: { ...shannon.manifest, description: "Fail once" } };
   try {
     const conversation = store.createConversation("Claude_Shannon", "0.1.0", null, "chat");
     const runtime = new ChatRuntime(server, fragileMind, store, paths, conversation);

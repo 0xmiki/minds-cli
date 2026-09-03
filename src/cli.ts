@@ -1,8 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { MINDS_VERSION } from "./version.ts";
-import { isAbsolute, resolve } from "node:path";
 import { completionScript } from "./completions.ts";
-import { getInstalledMind, installMind, listInstalledMinds, removeMind } from "./mind.ts";
+import { addMind, getInstalledMind, listInstalledMinds, removeMind } from "./mind.ts";
 import { getPaths } from "./paths.ts";
 import { ConversationStore } from "./storage.ts";
 import { runChat } from "./tui/index.tsx";
@@ -12,7 +11,7 @@ const HELP = `minds ${MINDS_VERSION}
 
 Usage:
   minds                         Open the last-used mind in a new conversation
-  minds fetch <slug-or-path>    Install an additional mind
+  minds add <wikipedia-slug>    Save another mind
   minds list                    List available minds
   minds chat <slug> [options]   Start a conversation with a mind
   minds chats [slug]            List saved conversations
@@ -60,21 +59,21 @@ export async function runCli(args = process.argv.slice(2)): Promise<number> {
     return 0;
   }
 
-  if (command === "fetch") {
-    const source = args[1];
-    if (!source) throw new Error("Usage: minds fetch <slug-or-path>");
-    const mind = await installMind(isAbsolute(source) ? source : source.startsWith(".") ? resolve(source) : source, paths.minds);
-    console.log(`Installed ${mind.manifest.name} ${mind.manifest.version}`);
+  if (command === "add") {
+    const id = args[1];
+    if (!id) throw new Error("Usage: minds add <wikipedia-slug>");
+    const mind = await addMind(paths.minds, id);
+    console.log(`Added ${mind.manifest.name}`);
     return 0;
   }
 
   if (command === "list") {
     const minds = await listInstalledMinds(paths.minds);
     if (minds.length === 0) {
-      console.log("No minds are available. Reinstall Minds or fetch a local mind.");
+      console.log("No minds are available. Reinstall Minds or add one from Wikipedia.");
       return 0;
     }
-    for (const mind of minds) console.log(`${mind.manifest.id}\t${mind.manifest.version}\t${mind.manifest.name}`);
+    for (const mind of minds) console.log(`${mind.manifest.id}\t${mind.manifest.name}${mind.manifest.description ? `\t${mind.manifest.description}` : ""}`);
     return 0;
   }
 
@@ -113,7 +112,7 @@ export async function runCli(args = process.argv.slice(2)): Promise<number> {
         return 0;
       }
       for (const conversation of conversations) {
-        console.log(`${conversation.id}\t${conversation.mindId}@${conversation.mindVersion}\t${formatDate(conversation.updatedAt)}\t${conversation.title ?? "Untitled"}`);
+        console.log(`${conversation.id}\t${conversation.mindId}\t${formatDate(conversation.updatedAt)}\t${conversation.title ?? "Untitled"}`);
       }
       return 0;
     }
@@ -138,7 +137,7 @@ export async function runCli(args = process.argv.slice(2)): Promise<number> {
     }
     const minds = await listInstalledMinds(paths.minds);
     if (minds.length === 0) {
-      console.log("No minds are available. Reinstall Minds or fetch a local mind.");
+      console.log("No minds are available. Reinstall Minds or add one from Wikipedia.");
       return 0;
     }
     const lastMindId = store.lastMindId();

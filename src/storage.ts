@@ -2,12 +2,15 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { Database } from "bun:sqlite";
 import type { Conversation, Message, MessageRole, MessageStatus, NativeThreadSummary, ResponseMode } from "./types.ts";
+import { MINDS_VERSION, PROMPT_CONTRACT_VERSION } from "./version.ts";
 
 interface ConversationRow {
   id: string;
   codex_thread_id: string | null;
   mind_id: string;
   mind_version: string;
+  app_version: string | null;
+  prompt_contract: number | null;
   model: string | null;
   response_mode: ResponseMode;
   title: string | null;
@@ -26,7 +29,7 @@ interface MessageRow {
 }
 
 function conversationFromRow(row: ConversationRow): Conversation {
-  return { id: row.id, codexThreadId: row.codex_thread_id ?? null, mindId: row.mind_id, mindVersion: row.mind_version, model: row.model, responseMode: row.response_mode ?? "full", title: row.title, createdAt: row.created_at, updatedAt: row.updated_at };
+  return { id: row.id, codexThreadId: row.codex_thread_id ?? null, mindId: row.mind_id, mindVersion: row.mind_version, appVersion: row.app_version ?? null, promptContract: row.prompt_contract ?? null, model: row.model, responseMode: row.response_mode ?? "full", title: row.title, createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
 function messageFromRow(row: MessageRow): Message {
@@ -90,6 +93,8 @@ export class ConversationStore {
         codex_thread_id TEXT,
         mind_id TEXT NOT NULL,
         mind_version TEXT NOT NULL,
+        app_version TEXT,
+        prompt_contract INTEGER,
         model TEXT,
         response_mode TEXT NOT NULL DEFAULT 'chat' CHECK (response_mode IN ('full', 'chat')),
         title TEXT,
@@ -119,6 +124,12 @@ export class ConversationStore {
     if (!columnNames(this.database, "conversations").has("codex_thread_id")) {
       this.database.exec("ALTER TABLE conversations ADD COLUMN codex_thread_id TEXT");
     }
+    if (!columnNames(this.database, "conversations").has("app_version")) {
+      this.database.exec("ALTER TABLE conversations ADD COLUMN app_version TEXT");
+    }
+    if (!columnNames(this.database, "conversations").has("prompt_contract")) {
+      this.database.exec("ALTER TABLE conversations ADD COLUMN prompt_contract INTEGER");
+    }
     if (!columnNames(this.database, "messages").has("mind_id")) {
       this.database.exec("ALTER TABLE messages ADD COLUMN mind_id TEXT");
       this.database.exec(`UPDATE messages SET mind_id = (
@@ -133,11 +144,11 @@ export class ConversationStore {
     this.database.close();
   }
 
-  createConversation(mindId: string, mindVersion: string, model: string | null = null, responseMode: ResponseMode = "chat"): Conversation {
+  createConversation(mindId: string, mindVersion = "identity", model: string | null = null, responseMode: ResponseMode = "chat"): Conversation {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
-    this.database.query(`INSERT INTO conversations (id, mind_id, mind_version, model, response_mode, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)`)
-      .run(id, mindId, mindVersion, model, responseMode, now, now);
+    this.database.query(`INSERT INTO conversations (id, mind_id, mind_version, app_version, prompt_contract, model, response_mode, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`)
+      .run(id, mindId, mindVersion, MINDS_VERSION, PROMPT_CONTRACT_VERSION, model, responseMode, now, now);
     return this.getConversation(id)!;
   }
 
@@ -173,9 +184,9 @@ export class ConversationStore {
     this.database.query("UPDATE conversations SET codex_thread_id = NULL WHERE id = ?").run(conversationId);
   }
 
-  setConversationMind(conversationId: string, mindId: string, mindVersion: string): void {
-    this.database.query("UPDATE conversations SET mind_id = ?, mind_version = ? WHERE id = ?")
-      .run(mindId, mindVersion, conversationId);
+  setConversationMind(conversationId: string, mindId: string): void {
+    this.database.query("UPDATE conversations SET mind_id = ?, mind_version = 'identity' WHERE id = ?")
+      .run(mindId, conversationId);
   }
 
   upsertNativeThread(thread: NativeThreadSummary, mindVersion: string): Conversation {
@@ -186,8 +197,8 @@ export class ConversationStore {
       return this.getConversation(existing.id)!;
     }
     const id = crypto.randomUUID();
-    this.database.query(`INSERT INTO conversations (id, codex_thread_id, mind_id, mind_version, model, response_mode, title, created_at, updated_at) VALUES (?, ?, ?, ?, NULL, 'chat', ?, ?, ?)`)
-      .run(id, thread.id, thread.mindId, mindVersion, thread.title || null, thread.createdAt, thread.updatedAt);
+    this.database.query(`INSERT INTO conversations (id, codex_thread_id, mind_id, mind_version, app_version, prompt_contract, model, response_mode, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NULL, 'chat', ?, ?, ?)`)
+      .run(id, thread.id, thread.mindId, mindVersion, MINDS_VERSION, PROMPT_CONTRACT_VERSION, thread.title || null, thread.createdAt, thread.updatedAt);
     return this.getConversation(id)!;
   }
 

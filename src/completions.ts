@@ -1,6 +1,6 @@
 export type CompletionShell = "bash" | "zsh" | "fish";
 
-const COMMANDS = "fetch list chat chats remove doctor completions help";
+const COMMANDS = "add list chat chats remove doctor completions help";
 const CHAT_OPTIONS = "--model --mode --help";
 
 function bashCompletion(): string {
@@ -20,11 +20,6 @@ _minds_completion() {
     local minds
     minds="$(minds list 2>/dev/null | cut -f1)"
     COMPREPLY=( $(compgen -W "$minds" -- "$current") )
-    return
-  fi
-
-  if (( COMP_CWORD == 2 )) && [[ "$command" == "fetch" ]]; then
-    COMPREPLY=( $(compgen -W "Aristotle Claude_Shannon Friedrich_Nietzsche Nikola_Tesla" -- "$current") )
     return
   fi
 
@@ -62,11 +57,6 @@ _minds() {
         _describe 'option' options
       fi
       ;;
-    fetch)
-      local -a bundled
-      bundled=(Aristotle Claude_Shannon Friedrich_Nietzsche Nikola_Tesla)
-      _describe 'bundled mind' bundled
-      ;;
     completions)
       local -a shells
       shells=(bash zsh fish)
@@ -86,7 +76,6 @@ end
 complete -c minds -f
 complete -c minds -n 'not __fish_seen_subcommand_from ${COMMANDS}' -a '${COMMANDS}'
 complete -c minds -n '__fish_seen_subcommand_from chat chats remove' -a '(__minds_ids)'
-complete -c minds -n '__fish_seen_subcommand_from fetch' -a 'Aristotle Claude_Shannon Friedrich_Nietzsche Nikola_Tesla'
 complete -c minds -n '__fish_seen_subcommand_from chat' -l model -r -d 'Override the Codex model'
 complete -c minds -n '__fish_seen_subcommand_from chat' -l mode -xa 'chat full' -d 'Choose the response style'
 complete -c minds -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish'`;
