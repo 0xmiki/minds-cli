@@ -1,9 +1,10 @@
 import { For } from "solid-js";
 import { TextAttributes } from "@opentui/core";
 import type { SlashCommand } from "./commands.ts";
+import type { ResponseMode } from "../types.ts";
 import { theme } from "./theme.ts";
 
-export function CommandPalette(props: { commands: SlashCommand[]; selected: number }) {
+export function CommandPalette(props: { commands: SlashCommand[]; selected: number; responseMode?: ResponseMode }) {
   return (
     <box
       width="100%"
@@ -16,6 +17,7 @@ export function CommandPalette(props: { commands: SlashCommand[]; selected: numb
       <For each={props.commands}>
         {(command, index) => {
           const active = () => index() === props.selected;
+          const mode = () => command.name === "/chat" ? "chat" : command.name === "/full" ? "full" : null;
           return (
             <box
               height={1}
@@ -28,7 +30,10 @@ export function CommandPalette(props: { commands: SlashCommand[]; selected: numb
               <text width={12} fg={active() ? theme.accent : theme.text} attributes={active() ? TextAttributes.BOLD : undefined}>
                 {active() ? "› " : "  "}{command.name}
               </text>
-              <text fg={theme.textMuted}>{command.description}</text>
+              <text flexGrow={1} minWidth={0} fg={theme.textMuted}>{command.description}</text>
+              <text width={2} fg={mode() && props.responseMode === mode() ? theme.accent : theme.textMuted}>
+                {mode() ? props.responseMode === mode() ? "●" : "○" : " "}
+              </text>
             </box>
           );
         }}

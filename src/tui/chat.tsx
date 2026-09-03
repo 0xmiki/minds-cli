@@ -29,11 +29,13 @@ interface ChatProps {
   responseMode?: ResponseMode;
 }
 
-function duration(milliseconds: number): string {
+export function formatDuration(milliseconds: number): string {
   if (milliseconds < 1_000) return `${Math.round(milliseconds)}ms`;
   if (milliseconds < 60_000) return `${(milliseconds / 1_000).toFixed(milliseconds < 10_000 ? 1 : 0)}s`;
   return `${Math.floor(milliseconds / 60_000)}m ${Math.round((milliseconds % 60_000) / 1_000)}s`;
 }
+
+export const THINKING_TICK_MS = 100;
 
 export function UserMessage(props: { message: Message }) {
   return (
@@ -77,6 +79,8 @@ export function Chat(props: ChatProps) {
 
   const [mind, setMind] = createSignal(props.mind);
   const [messages, setMessages] = createSignal<Message[]>(props.store.messages(runtime.id));
+  const [responseMode, setResponseMode] = createSignal<ResponseMode>(runtime.responseMode);
+  const [composerHeight, setComposerHeight] = createSignal(3);
   const [busy, setBusy] = createSignal(false);
   const [streaming, setStreaming] = createSignal("");
   const [status, setStatus] = createSignal("opening mind");
@@ -104,7 +108,7 @@ export function Chat(props: ChatProps) {
   const bottomInset = createMemo(() => dimensions().height < 32 ? 1 : 2);
   const compactHeader = createMemo(() => dimensions().width < 72);
   const emptyThread = createMemo(() => messages().length === 0 && !streaming() && !error());
-  const thinkingLabel = createMemo(() => busy() && status() === "thinking" ? `thinking  ${duration(elapsed())}` : status());
+  const thinkingLabel = createMemo(() => busy() && status() === "thinking" ? `thinking  ${formatDuration(elapsed())}` : status());
   const matchingCommands = createMemo(() => filterSlashCommands(composerValue()));
   const selectorOpen = createMemo(() => mindSwitcherOpen() || threadSwitcherOpen());
   const commandOpen = createMemo(() => !selectorOpen() && !busy() && matchingCommands().length > 0);
@@ -163,6 +167,7 @@ export function Chat(props: ChatProps) {
       return;
     }
     runtime.setResponseMode(nextMode);
+    setResponseMode(nextMode);
     setError(null);
     setStatus("ready");
     input?.focus();
@@ -209,6 +214,7 @@ export function Chat(props: ChatProps) {
       props.store.deleteIfEmpty(runtime.id);
       runtime.release();
       runtime = new ChatRuntime(server, nextMind, props.store, props.paths, nextConversation, props.model);
+      setResponseMode(runtime.responseMode);
       setMind(nextMind);
       setMessages(props.store.messages(runtime.id));
       setStreaming("");
@@ -333,7 +339,7 @@ export function Chat(props: ChatProps) {
     const timer = setInterval(() => {
       if (!busy() || status() !== "thinking") return;
       setElapsed(performance.now() - startedAt());
-    }, 1_000);
+    }, THINKING_TICK_MS);
     onCleanup(() => clearInterval(timer));
     input?.focus();
     try {
@@ -364,7 +370,7 @@ export function Chat(props: ChatProps) {
   const Overlays = () => (
     <>
       <Show when={mindSwitcherOpen()}>
-        <box position="absolute" left={0} bottom={3 + bottomInset()} width="100%" zIndex={20}>
+        <box position="absolute" left={0} bottom={composerHeight() + bottomInset()} width="100%" zIndex={20}>
           <MindSwitcher
             minds={availableMinds()}
             currentId={mind().manifest.id}
@@ -375,7 +381,7 @@ export function Chat(props: ChatProps) {
       </Show>
 
       <Show when={threadSwitcherOpen()}>
-        <box position="absolute" left={0} bottom={3 + bottomInset()} width="100%" zIndex={20}>
+        <box position="absolute" left={0} bottom={composerHeight() + bottomInset()} width="100%" zIndex={20}>
           <ThreadSwitcher
             conversations={availableConversations()}
             currentId={runtime.id}
@@ -387,21 +393,22 @@ export function Chat(props: ChatProps) {
       </Show>
 
       <Show when={commandOpen()}>
-        <box position="absolute" left={0} bottom={3 + bottomInset()} width="100%" zIndex={20}>
-          <CommandPalette commands={matchingCommands()} selected={commandIndex()} />
+        <box position="absolute" left={0} bottom={composerHeight() + bottomInset()} width="100%" zIndex={20}>
+          <CommandPalette commands={matchingCommands()} selected={commandIndex()} responseMode={responseMode()} />
         </box>
       </Show>
     </>
   );
 
   const InputArea = () => (
-    <box width="100%" height={3} flexShrink={0}>
+    <box width="100%" height={composerHeight()} flexShrink={0}>
       <Composer
         mindName={mind().manifest.name}
         status={thinkingLabel()}
         busy={busy()}
         commandOpen={commandOpen()}
         active={!selectorOpen()}
+        onHeightChange={setComposerHeight}
         inputRef={(value) => { input = value; }}
         onInput={(value) => {
           setComposerValue(value);

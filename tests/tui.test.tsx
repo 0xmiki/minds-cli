@@ -11,8 +11,8 @@ import { renderInlineMath, splitRichContent } from "../src/tui/math.ts";
 import { Composer } from "../src/tui/composer.tsx";
 import { MindSwitcher } from "../src/tui/mind-switcher.tsx";
 import { ThreadSwitcher } from "../src/tui/thread-switcher.tsx";
-import { EmptyConversation, MindMessage, UserMessage } from "../src/tui/chat.tsx";
-import type { InputRenderable, TextareaRenderable } from "@opentui/core";
+import { EmptyConversation, formatDuration, MindMessage, THINKING_TICK_MS, UserMessage } from "../src/tui/chat.tsx";
+import { PasteEvent, type InputRenderable, type TextareaRenderable } from "@opentui/core";
 import { ConversationStore } from "../src/storage.ts";
 
 test("renders Markdown lists and code without raw fences", async () => {
@@ -81,7 +81,7 @@ test("shows and filters slash commands", async () => {
   expect(filterSlashCommands("/ret").map((command) => command.name)).toEqual(["/retry"]);
 
   const setup = await testRender(
-    () => <CommandPalette commands={filterSlashCommands("/")} selected={0} />,
+    () => <CommandPalette commands={filterSlashCommands("/")} selected={0} responseMode="chat" />,
     { width: 70, height: 12 },
   );
   try {
@@ -91,6 +91,10 @@ test("shows and filters slash commands", async () => {
     expect(frame).toContain("Start a clean conversation");
     expect(frame).toContain("/retry");
     expect(frame).toContain("/quit");
+    expect(frame).toContain("●");
+    expect(frame).toContain("○");
+    expect(frame).toMatch(/\/chat.*●/);
+    expect(frame).toMatch(/\/full.*○/);
   } finally {
     setup.renderer.destroy();
   }
@@ -236,6 +240,7 @@ test("renders a plain mind reply beneath its name", async () => {
 
 test("keeps the minimal composer focused", async () => {
   let submissions = 0;
+  let height = 3;
   const setup = await testRender(
     () => (
       <box width="100%" height="100%" flexDirection="column">
@@ -247,13 +252,14 @@ test("keeps the minimal composer focused", async () => {
           status="ready"
           busy={false}
           commandOpen={false}
+          onHeightChange={(value) => { height = value; }}
           inputRef={() => {}}
           onInput={() => {}}
           onSubmit={() => { submissions++; }}
         />
       </box>
     ),
-    { width: 80, height: 8 },
+    { width: 80, height: 8, kittyKeyboard: true },
   );
   try {
     await setup.renderOnce();
@@ -268,6 +274,32 @@ test("keeps the minimal composer focused", async () => {
     expect(input.focused).toBe(true);
     expect(input.cursorStyle.style).toBe("block");
     expect(input.cursorStyle.blinking).toBe(false);
+    input.handlePaste(new PasteEvent(new TextEncoder().encode("first line\nsecond line\nthird line")));
+    await Bun.sleep(10);
+    await setup.renderOnce();
+    expect(input.plainText).toBe("first line\nsecond line\nthird line");
+    expect(height).toBe(5);
+    input.clear();
+    await setup.renderOnce();
+    await setup.mockInput.typeText("first");
+    setup.mockInput.pressEnter({ shift: true });
+    await setup.mockInput.typeText("second");
+    await Bun.sleep(10);
+    await setup.renderOnce();
+    expect(submissions).toBe(0);
+    expect(input.plainText).toBe("first\nsecond");
+    expect(height).toBe(4);
+    input.clear();
+    await setup.renderOnce();
+    await setup.mockInput.typeText("alpha");
+    setup.mockInput.pressEnter({ ctrl: true });
+    await setup.mockInput.typeText("beta");
+    await Bun.sleep(10);
+    await setup.renderOnce();
+    expect(submissions).toBe(0);
+    expect(input.plainText).toBe("alpha\nbeta");
+    input.clear();
+    await setup.renderOnce();
     await setup.mockInput.typeText("hello");
     setup.mockInput.pressEnter();
     await setup.renderOnce();
@@ -285,4 +317,10 @@ test("keeps the minimal composer focused", async () => {
   } finally {
     setup.renderer.destroy();
   }
+});
+
+test("formats thinking time with subsecond updates", () => {
+  expect(THINKING_TICK_MS).toBe(100);
+  expect(formatDuration(349)).toBe("349ms");
+  expect(formatDuration(1_349)).toBe("1.3s");
 });

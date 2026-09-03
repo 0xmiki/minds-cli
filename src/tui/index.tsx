@@ -17,6 +17,10 @@ async function mount(node: () => unknown): Promise<void> {
     consoleMode: "disabled",
     openConsoleOnError: false,
     targetFps: 60,
+    useKittyKeyboard: {
+      disambiguate: true,
+      alternateKeys: true,
+    },
     onDestroy: finish,
   });
   await done;
