@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { Database } from "bun:sqlite";
 import { ConversationStore } from "../src/storage.ts";
+import { MINDS_VERSION } from "../src/version.ts";
 
 test("persists runtime metadata and completed messages", async () => {
   const root = await mkdtemp(join(tmpdir(), "minds-storage-"));
@@ -20,7 +21,7 @@ test("persists runtime metadata and completed messages", async () => {
   assert.equal(latest?.model, "test-model");
   assert.equal(latest?.responseMode, "chat");
   assert.equal(latest?.codexThreadId, null);
-  assert.equal(latest?.appVersion, "0.5.0");
+  assert.equal(latest?.appVersion, MINDS_VERSION);
   assert.equal(latest?.promptContract, 3);
   store.setCodexThreadId(conversation.id, "codex-thread-1");
   assert.equal(store.findByCodexThreadId("codex-thread-1")?.id, conversation.id);

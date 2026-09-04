@@ -14,10 +14,10 @@ Requirements:
 - Codex CLI installed and logged in
 - Linux, macOS, or Windows
 
-Install the latest GitHub release:
+Install from npm:
 
 ```bash
-bun add -g minds-cli@https://github.com/0xmiki/minds-cli/releases/latest/download/minds-cli.tgz
+bun add -g minds-cli
 ```
 
 Then run:
@@ -37,6 +37,7 @@ Inside a conversation:
 
 ```text
 /minds    Change the active mind in this thread
+/model    Choose a model and reasoning level
 /resume   Open saved thread history
 /chat     Use short conversational replies
 /full     Use developed replies
@@ -95,6 +96,10 @@ bun dist/index.js
 ```
 
 Minds stores local state under the platform data directory. Set `MINDS_DATA_DIR` to use another location.
+
+## Publishing
+
+Maintainers: see [the release guide](https://github.com/0xmiki/minds-cli/blob/main/docs/publishing.md) for the first npm release and automatic publishing from version tags.
 
 ## License
 
