@@ -19,7 +19,7 @@ export class ChatRuntime {
     private readonly store: ConversationStore,
     private readonly paths: MindsPaths,
     conversation: Conversation,
-    private readonly requestedModel?: string,
+    private requestedModel?: string,
     requestedResponseMode?: ResponseMode,
   ) {
     this.conversation = conversation;
@@ -39,7 +39,17 @@ export class ChatRuntime {
   }
 
   get model(): string | null {
-    return this.currentConversation.model ?? this.requestedModel ?? null;
+    return this.requestedModel ?? this.currentConversation.model ?? null;
+  }
+
+  get reasoningEffort(): string | null {
+    return this.currentConversation.reasoningEffort ?? null;
+  }
+
+  setModel(model: string, effort: string | null): void {
+    this.requestedModel = model;
+    this.store.setModelSelection(this.id, model, effort);
+    this.activatedKey = null;
   }
 
   get responseMode(): ResponseMode {
@@ -101,6 +111,8 @@ export class ChatRuntime {
   }
 
   newConversation(): void {
+    const model = this.model;
+    const effort = this.reasoningEffort;
     this.release();
     this.store.deleteIfEmpty(this.conversation.id);
     this.conversation = this.store.createConversation(
@@ -109,6 +121,7 @@ export class ChatRuntime {
       this.requestedModel ?? null,
       this.selectedResponseMode,
     );
+    if (model) this.store.setModelSelection(this.id, model, effort);
     this.activatedKey = null;
     this.activatedGeneration = 0;
     this.threadHasName = false;
@@ -156,7 +169,7 @@ export class ChatRuntime {
           this.threadHasName = false;
         });
       }
-      const result = await this.server.turn(threadId, text, onDelta);
+      const result = await this.server.turn(threadId, text, onDelta, this.reasoningEffort);
       if (result.text) {
         this.store.addMessage(this.conversation.id, "mind", result.text, result.status, this.mind.manifest.id);
       }

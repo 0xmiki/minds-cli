@@ -5,7 +5,7 @@ import {
   type TextareaRenderable,
 } from "@opentui/core";
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid";
-import { CodexAppServer } from "../codex-app-server.ts";
+import { CodexAppServer, type CodexModel } from "../codex-app-server.ts";
 import { getInstalledMind, listInstalledMinds } from "../mind.ts";
 import type { MindsPaths } from "../paths.ts";
 import { ConversationStore } from "../storage.ts";
@@ -14,6 +14,7 @@ import { ChatRuntime } from "./chat-runtime.ts";
 import { CommandPalette } from "./command-palette.tsx";
 import { filterSlashCommands, SLASH_COMMANDS } from "./commands.ts";
 import { Composer } from "./composer.tsx";
+import { ModelSwitcher } from "./model-switcher.tsx";
 import { MindSwitcher } from "./mind-switcher.tsx";
 import { MindMarkdown } from "./markdown.tsx";
 import { ThreadSwitcher } from "./thread-switcher.tsx";
@@ -77,6 +78,46 @@ export function Chat(props: ChatProps) {
   const server = new CodexAppServer();
   let runtime = new ChatRuntime(server, props.mind, props.store, props.paths, conversation, props.model, props.responseMode);
 
+  const [currentModel, setCurrentModel] = createSignal(runtime.model);
+  const [currentEffort, setCurrentEffort] = createSignal(runtime.reasoningEffort);
+  const [modelSwitcherOpen, setModelSwitcherOpen] = createSignal(false);
+  const [models, setModels] = createSignal<CodexModel[]>([]);
+  const [modelsLoading, setModelsLoading] = createSignal(false);
+  const [modelsError, setModelsError] = createSignal<string | null>(null);
+  let defaultModel: string | null = null;
+  let defaultEffort: string | null = null;
+  const syncModel = () => {
+    setCurrentModel(runtime.model ?? defaultModel);
+    const model = models().find((item) => item.model === (runtime.model ?? defaultModel));
+    setCurrentEffort(runtime.reasoningEffort ?? defaultEffort ?? model?.defaultReasoningEffort ?? null);
+  };
+  const loadModels = async () => {
+    setModelsLoading(true);
+    setModelsError(null);
+    try {
+      await runtime.prepare();
+      const [available, defaults] = await Promise.all([server.listModels(), server.modelDefaults()]);
+      setModels(available);
+      defaultModel = defaults.model ?? available.find((item) => item.isDefault)?.model ?? null;
+      defaultEffort = defaults.effort;
+      syncModel();
+    } catch (cause) {
+      setModelsError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setModelsLoading(false);
+    }
+  };
+  const closeModelSwitcher = () => {
+    setModelSwitcherOpen(false);
+    setStatus("ready");
+    input?.focus();
+  };
+  const openModelSwitcher = () => {
+    setModelSwitcherOpen(true);
+    setStatus("choose a model");
+    input?.blur();
+    if (!modelsLoading()) void loadModels();
+  };
   const [mind, setMind] = createSignal(props.mind);
   const [messages, setMessages] = createSignal<Message[]>(props.store.messages(runtime.id));
   const [responseMode, setResponseMode] = createSignal<ResponseMode>(runtime.responseMode);
@@ -110,7 +151,7 @@ export function Chat(props: ChatProps) {
   const emptyThread = createMemo(() => messages().length === 0 && !streaming() && !error());
   const thinkingLabel = createMemo(() => busy() && status() === "thinking" ? `thinking  ${formatDuration(elapsed())}` : status());
   const matchingCommands = createMemo(() => filterSlashCommands(composerValue()));
-  const selectorOpen = createMemo(() => mindSwitcherOpen() || threadSwitcherOpen());
+  const selectorOpen = createMemo(() => mindSwitcherOpen() || threadSwitcherOpen() || modelSwitcherOpen());
   const commandOpen = createMemo(() => !selectorOpen() && !busy() && matchingCommands().length > 0);
   const messageMindName = (message: Message) => {
     const id = message.mindId ?? mind().manifest.id;
@@ -154,6 +195,7 @@ export function Chat(props: ChatProps) {
 
   const startNew = () => {
     runtime.newConversation();
+    syncModel();
     setMessages([]);
     setLastRetryablePrompt(null);
     setStatus("ready");
@@ -215,6 +257,7 @@ export function Chat(props: ChatProps) {
       runtime.release();
       runtime = new ChatRuntime(server, nextMind, props.store, props.paths, nextConversation, props.model);
       setResponseMode(runtime.responseMode);
+      syncModel();
       setMind(nextMind);
       setMessages(props.store.messages(runtime.id));
       setStreaming("");
@@ -265,6 +308,7 @@ export function Chat(props: ChatProps) {
 
     if (value === "/quit") return renderer.destroy();
     if (value === "/resume") return openThreadSwitcher();
+    if (value === "/model") return openModelSwitcher();
     if (value === "/minds") return openMindSwitcher();
     if (value === "/new") return startNew();
     if (value === "/chat") return switchResponseMode("chat");
@@ -275,7 +319,7 @@ export function Chat(props: ChatProps) {
     }
 
     if (value === "/help" || value === "/") {
-      setStatus("/resume  /minds  /chat  /full  /new  /retry  /clear  /help  /quit");
+      setStatus("/resume  /minds  /model  /chat  /full  /new  /retry  /clear  /help  /quit");
       return;
     }
 
@@ -303,6 +347,7 @@ export function Chat(props: ChatProps) {
     if (streamFlushTimer) clearTimeout(streamFlushTimer);
     flushStream();
     refresh();
+    syncModel();
     setStreaming("");
     setBusy(false);
     setStatus(result.status === "completed" ? "ready" : result.status);
@@ -345,9 +390,10 @@ export function Chat(props: ChatProps) {
     try {
       const mindsPromise = listInstalledMinds(props.paths.minds).then(setAvailableMinds);
       await Promise.all([mindsPromise, runtime.prepare()]);
+      void loadModels();
       if (!busy() && !selectorOpen()) setStatus("ready");
       props.store.setLastMindId(mind().manifest.id);
-      input?.focus();
+      if (!selectorOpen()) input?.focus();
       scrollToBottom();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -369,6 +415,18 @@ export function Chat(props: ChatProps) {
 
   const Overlays = () => (
     <>
+      <Show when={modelSwitcherOpen()}>
+        <box position="absolute" left={0} bottom={composerHeight() + bottomInset()} width="100%" zIndex={20}>
+          <ModelSwitcher models={models()} currentModel={currentModel()} currentEffort={currentEffort()}
+            loading={modelsLoading()} error={modelsError()}
+            onRetry={() => { void loadModels(); }} onClose={closeModelSwitcher}
+            onSelect={(model, effort) => {
+              runtime.setModel(model, effort);
+              syncModel();
+              closeModelSwitcher();
+            }} />
+        </box>
+      </Show>
       <Show when={mindSwitcherOpen()}>
         <box position="absolute" left={0} bottom={composerHeight() + bottomInset()} width="100%" zIndex={20}>
           <MindSwitcher
@@ -394,7 +452,7 @@ export function Chat(props: ChatProps) {
 
       <Show when={commandOpen()}>
         <box position="absolute" left={0} bottom={composerHeight() + bottomInset()} width="100%" zIndex={20}>
-          <CommandPalette commands={matchingCommands()} selected={commandIndex()} responseMode={responseMode()} />
+          <CommandPalette commands={matchingCommands()} selected={commandIndex()} responseMode={responseMode()} model={currentModel()} reasoningEffort={currentEffort()} onSelect={(command) => { void submit(command.name); }} />
         </box>
       </Show>
     </>

@@ -22,6 +22,16 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
+export interface CodexModel {
+  id: string;
+  model: string;
+  displayName: string;
+  isDefault: boolean;
+  hidden: boolean;
+  defaultReasoningEffort: string;
+  supportedReasoningEfforts: Array<{ reasoningEffort: string; description: string }>;
+}
+
 export interface TurnResult {
   text: string;
   status: "completed" | "interrupted" | "failed";
@@ -237,12 +247,37 @@ export class CodexAppServer {
     }
   }
 
-  async turn(threadId: string, text: string, onDelta: (delta: string) => void): Promise<TurnResult> {
+  async listModels(): Promise<CodexModel[]> {
+    const models: CodexModel[] = [];
+    let cursor: string | null = null;
+    const seen = new Set<string>();
+    do {
+      const result = record(await this.request("model/list", { cursor, includeHidden: false }));
+      if (!Array.isArray(result?.data)) throw new Error("Codex returned an invalid model list");
+      models.push(...(result.data as CodexModel[]).filter((model) => !model.hidden));
+      cursor = typeof result.nextCursor === "string" ? result.nextCursor : null;
+      if (cursor && seen.has(cursor)) throw new Error("Codex repeated a model list page");
+      if (cursor) seen.add(cursor);
+    } while (cursor);
+    return models;
+  }
+
+  async modelDefaults(): Promise<{ model: string | null; effort: string | null }> {
+    const result = record(await this.request("config/read", {}));
+    const config = record(result?.config);
+    return {
+      model: typeof config?.model === "string" ? config.model : null,
+      effort: typeof config?.model_reasoning_effort === "string" ? config.model_reasoning_effort : null,
+    };
+  }
+
+  async turn(threadId: string, text: string, onDelta: (delta: string) => void, effort?: string | null): Promise<TurnResult> {
     if (!this.connected) throw new Error("Codex app-server is not connected");
     if (this.activeTurn) throw new Error("A mind turn is already running");
     const response = record(await this.request("turn/start", {
       threadId,
       input: [{ type: "text", text, text_elements: [] }],
+      ...(effort != null ? { effort } : {}),
     }));
     const turn = record(response?.turn);
     if (!turn || typeof turn.id !== "string") {

@@ -4,7 +4,7 @@ import type { SlashCommand } from "./commands.ts";
 import type { ResponseMode } from "../types.ts";
 import { theme } from "./theme.ts";
 
-export function CommandPalette(props: { commands: SlashCommand[]; selected: number; responseMode?: ResponseMode }) {
+export function CommandPalette(props: { commands: SlashCommand[]; selected: number; responseMode?: ResponseMode; model?: string | null; reasoningEffort?: string | null; onSelect?: (command: SlashCommand) => void }) {
   return (
     <box
       width="100%"
@@ -20,6 +20,7 @@ export function CommandPalette(props: { commands: SlashCommand[]; selected: numb
           const mode = () => command.name === "/chat" ? "chat" : command.name === "/full" ? "full" : null;
           return (
             <box
+              onMouseDown={() => props.onSelect?.(command)}
               height={1}
               flexShrink={0}
               flexDirection="row"
@@ -30,7 +31,7 @@ export function CommandPalette(props: { commands: SlashCommand[]; selected: numb
               <text width={12} fg={active() ? theme.accent : theme.text} attributes={active() ? TextAttributes.BOLD : undefined}>
                 {active() ? "› " : "  "}{command.name}
               </text>
-              <text flexGrow={1} minWidth={0} fg={theme.textMuted}>{command.description}</text>
+              <text flexGrow={1} minWidth={0} fg={theme.textMuted}>{command.name === "/model" ? `${props.model ?? "default"} · ${props.reasoningEffort ?? "default"}` : command.description}</text>
               <text width={2} fg={mode() && props.responseMode === mode() ? theme.accent : theme.textMuted}>
                 {mode() ? props.responseMode === mode() ? "●" : "○" : " "}
               </text>

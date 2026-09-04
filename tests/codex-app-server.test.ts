@@ -47,6 +47,21 @@ function fakeProcess(log: Array<Record<string, unknown>>): ChildProcessWithoutNu
       send({ id, result: { userAgent: "fake", codexHome: "/tmp", platformFamily: "unix", platformOs: "linux" } });
       return;
     }
+    if (message.method === "config/read") {
+      send({ id, result: { config: { model: "configured-model", model_reasoning_effort: "high" } } });
+      return;
+    }
+    if (message.method === "model/list") {
+      const model = (name: string, hidden = false) => ({
+        id: name, model: name, displayName: name, hidden, isDefault: false,
+        defaultReasoningEffort: "low",
+        supportedReasoningEfforts: [{ reasoningEffort: "low", description: "Fast" }, { reasoningEffort: "high", description: "Thorough" }],
+      });
+      send({ id, result: message.params.cursor
+        ? { data: [model("second")], nextCursor: null }
+        : { data: [model("first"), model("hidden", true)], nextCursor: "page2" } });
+      return;
+    }
     if (message.method === "thread/start") {
       if (!failedStart && message.params.baseInstructions?.includes("Fail once")) {
         failedStart = true;
@@ -298,6 +313,42 @@ test("reconnects and resumes the same thread after the app-server exits", async 
     expect(processStarts()).toBe(2);
     expect(log.filter((item) => item.method === "initialize")).toHaveLength(2);
     expect(log.findLast((item) => item.method === "thread/resume")?.params.threadId).toBe(threadId);
+  } finally {
+    store.close();
+  }
+});
+
+test("loads configured defaults and all visible model pages", async () => {
+  const { root, server } = await fixture();
+  await server.prepare(root);
+  expect((await server.listModels()).map((model) => model.model)).toEqual(["first", "second"]);
+  expect(await server.modelDefaults()).toEqual({ model: "configured-model", effort: "high" });
+});
+
+test("model and reasoning changes persist and apply to resumed and new turns", async () => {
+  const { root, log, server } = await fixture();
+  const store = new ConversationStore(join(root, "conversations.sqlite3"));
+  const paths = { data: root, minds: join(root, "minds"), database: join(root, "conversations.sqlite3"), workspaces: join(root, "workspaces") };
+  try {
+    const conversation = store.createConversation("Claude_Shannon");
+    const runtime = new ChatRuntime(server, shannon, store, paths, conversation, "original-model");
+    await runtime.ask("First", () => {});
+    const threadId = runtime.currentConversation.codexThreadId;
+    runtime.setModel("second", "high");
+    expect(store.getConversation(runtime.id)).toMatchObject({ model: "second", reasoningEffort: "high" });
+    await runtime.ask("Next", () => {});
+    expect(runtime.currentConversation.codexThreadId).toBe(threadId);
+    expect(log.filter((item) => item.method === "thread/resume").at(-1)?.params.model).toBe("second");
+    expect(log.filter((item) => item.method === "turn/start").at(-1)?.params.effort).toBe("high");
+    const resumed = new ChatRuntime(server, shannon, store, paths, store.getConversation(runtime.id)!);
+    expect(resumed.model).toBe("second");
+    expect(resumed.reasoningEffort).toBe("high");
+    runtime.newConversation();
+    expect(runtime.model).toBe("second");
+    expect(runtime.reasoningEffort).toBe("high");
+    await runtime.ask("Fresh", () => {});
+    expect(log.filter((item) => item.method === "thread/start").at(-1)?.params.model).toBe("second");
+    expect(log.filter((item) => item.method === "turn/start").at(-1)?.params.effort).toBe("high");
   } finally {
     store.close();
   }

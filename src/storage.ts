@@ -12,6 +12,7 @@ interface ConversationRow {
   app_version: string | null;
   prompt_contract: number | null;
   model: string | null;
+  reasoning_effort: string | null;
   response_mode: ResponseMode;
   title: string | null;
   created_at: string;
@@ -29,7 +30,7 @@ interface MessageRow {
 }
 
 function conversationFromRow(row: ConversationRow): Conversation {
-  return { id: row.id, codexThreadId: row.codex_thread_id ?? null, mindId: row.mind_id, mindVersion: row.mind_version, appVersion: row.app_version ?? null, promptContract: row.prompt_contract ?? null, model: row.model, responseMode: row.response_mode ?? "full", title: row.title, createdAt: row.created_at, updatedAt: row.updated_at };
+  return { id: row.id, codexThreadId: row.codex_thread_id ?? null, mindId: row.mind_id, mindVersion: row.mind_version, appVersion: row.app_version ?? null, promptContract: row.prompt_contract ?? null, model: row.model, reasoningEffort: row.reasoning_effort ?? null, responseMode: row.response_mode ?? "full", title: row.title, createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
 function messageFromRow(row: MessageRow): Message {
@@ -118,6 +119,9 @@ export class ConversationStore {
       DROP INDEX IF EXISTS conversations_expert;
       CREATE INDEX IF NOT EXISTS conversations_mind ON conversations(mind_id, updated_at DESC);
     `);
+    if (!columnNames(this.database, "conversations").has("reasoning_effort")) {
+      this.database.exec("ALTER TABLE conversations ADD COLUMN reasoning_effort TEXT");
+    }
     if (!columnNames(this.database, "conversations").has("response_mode")) {
       this.database.exec("ALTER TABLE conversations ADD COLUMN response_mode TEXT NOT NULL DEFAULT 'full' CHECK (response_mode IN ('full', 'chat'))");
     }
@@ -256,6 +260,10 @@ export class ConversationStore {
     this.database.query("UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?").run(title, now, conversationId);
     const row = this.database.query("SELECT * FROM messages WHERE id = ?").get(Number(result.lastInsertRowid));
     return messageFromRow(row as MessageRow);
+  }
+
+  setModelSelection(conversationId: string, model: string, effort: string | null): void {
+    this.database.query("UPDATE conversations SET model = ?, reasoning_effort = ? WHERE id = ?").run(model, effort, conversationId);
   }
 
   setModel(conversationId: string, model: string): void {

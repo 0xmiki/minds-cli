@@ -6,6 +6,7 @@ export interface SlashCommand {
 export const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: "/resume", description: "Open a saved conversation" },
   { name: "/minds", description: "Change the active mind in this thread" },
+  { name: "/model", description: "Choose model and reasoning level" },
   { name: "/chat", description: "Use short, text-message replies" },
   { name: "/full", description: "Use complete, developed replies" },
   { name: "/new", description: "Start a clean conversation" },

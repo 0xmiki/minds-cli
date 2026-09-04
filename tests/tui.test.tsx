@@ -9,6 +9,7 @@ import { CommandPalette } from "../src/tui/command-palette.tsx";
 import { filterSlashCommands } from "../src/tui/commands.ts";
 import { renderInlineMath, splitRichContent } from "../src/tui/math.ts";
 import { Composer } from "../src/tui/composer.tsx";
+import { ModelSwitcher } from "../src/tui/model-switcher.tsx";
 import { MindSwitcher } from "../src/tui/mind-switcher.tsx";
 import { ThreadSwitcher } from "../src/tui/thread-switcher.tsx";
 import { EmptyConversation, formatDuration, MindMessage, THINKING_TICK_MS, UserMessage } from "../src/tui/chat.tsx";
@@ -69,6 +70,7 @@ test("shows and filters slash commands", async () => {
   expect(filterSlashCommands("/").map((command) => command.name)).toEqual([
     "/resume",
     "/minds",
+    "/model",
     "/chat",
     "/full",
     "/new",
@@ -81,12 +83,13 @@ test("shows and filters slash commands", async () => {
   expect(filterSlashCommands("/ret").map((command) => command.name)).toEqual(["/retry"]);
 
   const setup = await testRender(
-    () => <CommandPalette commands={filterSlashCommands("/")} selected={0} responseMode="chat" />,
+    () => <CommandPalette commands={filterSlashCommands("/")} selected={0} responseMode="chat" model="test-model" reasoningEffort="high" />,
     { width: 70, height: 12 },
   );
   try {
     await setup.renderOnce();
     const frame = setup.captureCharFrame();
+    expect(frame).toContain("test-model · high");
     expect(frame).toContain("/new");
     expect(frame).toContain("Start a clean conversation");
     expect(frame).toContain("/retry");
@@ -323,4 +326,43 @@ test("formats thinking time with subsecond updates", () => {
   expect(THINKING_TICK_MS).toBe(100);
   expect(formatDuration(349)).toBe("349ms");
   expect(formatDuration(1_349)).toBe("1.3s");
+});
+
+test("model selection opens reasoning levels and commits only after choosing a level", async () => {
+  const models = ["first", "second"].map((model) => ({
+    id: model, model, displayName: model, hidden: false, isDefault: model === "first",
+    defaultReasoningEffort: "low",
+    supportedReasoningEfforts: [
+      { reasoningEffort: "low", description: "Fast" },
+      { reasoningEffort: "high", description: "Thorough" },
+    ],
+  }));
+  let selection: unknown = null;
+  let closed = false;
+  const setup = await testRender(() => <ModelSwitcher models={models}
+    currentModel="first" currentEffort="high" loading={false} error={null}
+    onSelect={(model, effort) => { selection = { model, effort }; }}
+    onClose={() => { closed = true; }} onRetry={() => {}} />, { width: 76, height: 12 });
+  const frame = async () => { await Bun.sleep(40); await setup.renderOnce(); return setup.captureCharFrame(); };
+  try {
+    expect(await frame()).toContain("current");
+    setup.mockInput.pressArrow("down");
+    await frame();
+    setup.mockInput.pressEnter();
+    expect(await frame()).toContain("Reasoning · second");
+    expect(selection).toBeNull();
+    setup.mockInput.pressArrow("down");
+    await frame();
+    setup.mockInput.pressEnter();
+    await frame();
+    expect(selection).toEqual({ model: "second", effort: "high" });
+    setup.mockInput.pressEscape();
+    expect(await frame()).toContain("Choose model");
+    expect(closed).toBe(false);
+    setup.mockInput.pressEscape();
+    await frame();
+    expect(closed).toBe(true);
+  } finally {
+    setup.renderer.destroy();
+  }
 });

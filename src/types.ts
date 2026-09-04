@@ -27,6 +27,7 @@ export interface Conversation {
   appVersion: string | null;
   promptContract: number | null;
   model: string | null;
+  reasoningEffort?: string | null;
   responseMode: ResponseMode;
   title: string | null;
   createdAt: string;
