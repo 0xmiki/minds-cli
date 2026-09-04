@@ -43,7 +43,7 @@ jobs:
         run: |
           PACKAGE_VERSION=$(jq -r '.version' package.json)
           test "v${PACKAGE_VERSION}" = "${GITHUB_REF_NAME}"
-          bun -e 'import { MINDS_VERSION } from "./src/version.ts"; import pkg from "./package.json"; if (MINDS_VERSION !== pkg.version) throw new Error("CLI and package versions differ");'
+          node --input-type=module -e 'import { readFileSync } from "node:fs"; const pkg = JSON.parse(readFileSync("package.json", "utf8")); const source = readFileSync("src/version.ts", "utf8"); if (!source.includes(`export const MINDS_VERSION = "${pkg.version}";`)) throw new Error("CLI and package versions differ");'
 
       - name: Install dependencies
         run: bun ci
